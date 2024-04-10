@@ -3,4 +3,4 @@
 application_default_credentials.json
 vendor/
 server/server
-infra/.env
+dist/

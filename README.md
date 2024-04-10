@@ -1,7 +1,6 @@
 - [Ping42 Telemetry Server](#ping42-telemetry-server)
   - [BigQuery Development](#bigquery-development)
   - [The Generator](#the-generator)
-  - [Deploying the server](#deploying-the-server)
 
 # Ping42 Telemetry Server
 
@@ -33,19 +32,3 @@ gcloud alpha bq datasets delete clients --remove-tables
 ## The Generator
 
 The `generator/` folder contains boilerplate code that dispatches generated events to the function for testing purposes. To run it, try `go run .` in that folder.
-
-## Deploying the server
-
-The server is deployed automatically by the Github Actions. Please see the `.github/workflows` folder for more info.
-
-To deploy by hand:
-
-```bash
-gcloud functions deploy dsn-carrier \
-    --gen2 \
-    --runtime=go121 --region=us-central1 \
-    --source=. \
-    --entry-point=SignalCarrier \
-    --trigger-http \
-    --allow-unauthenticated
-```

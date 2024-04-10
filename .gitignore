@@ -1,0 +1,6 @@
+# OSX Resource Forks
+.DS_Store
+application_default_credentials.json
+vendor/
+server/server
+infra/.env

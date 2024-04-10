@@ -49,7 +49,9 @@ var (
 
 func init() {
 
-	logger.Logger.Info(fmt.Sprintf("Initializing Ping42 Telemetry Server %v commit %v", version, commit))
+	logger.Logger.Info(
+		fmt.Sprintf("Initializing Ping42 Telemetry Server %v commit %v built %v", version, commit, date),
+	)
 
 	configuration = config.GetConfig()
 	var err error

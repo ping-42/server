@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -39,7 +40,16 @@ var configuration config.Configuration
 var redisClient *redis.Client
 var ws42 wsServer
 
+// Release versioning magic
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 func init() {
+
+	logger.Logger.Info(fmt.Sprintf("Initializing Ping42 Telemetry Server %v commit %v", version, commit))
 
 	configuration = config.GetConfig()
 	var err error
@@ -60,8 +70,6 @@ func init() {
 }
 
 func main() {
-
-	serverLogger.Info("Service started") // TODO: add compile vars to indicate version & commit hash
 
 	// set up logging
 	log.SetFlags(0)

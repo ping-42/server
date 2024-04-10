@@ -18,12 +18,10 @@ require (
 	github.com/go-gormigrate/gormigrate/v2 v2.1.2 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
-	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	gorm.io/driver/postgres v1.5.7 // indirect
-	gotest.tools/v3 v3.5.1 // indirect
 )
 
 require (

@@ -19,6 +19,8 @@ builds:
     # only needed if you actually use those things in your main package, otherwise can be ignored.
     - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }}
   dir: "server/"
+  id: "server"
+  binary: "server"
 
 # proxies from the go mod proxy before building
 # https://goreleaser.com/customization/gomod
@@ -45,14 +47,15 @@ sboms:
 # create a docker image
 # https://goreleaser.com/customization/docker
 dockers:
-- image_templates:
-  - 'ghcr.io/ping-42/server:{{ .Tag }}'
-  - 'ghcr.io/ping-42/server:latest'
+- id: "ping42-server"
+  image_templates:
+    - 'ghcr.io/ping-42/server:{{ .Tag }}'
+    - 'ghcr.io/ping-42/server:latest'
   dockerfile: Dockerfile
   build_flag_templates:
-  - "--pull"
-  - "--label=org.opencontainers.image.created={{.Date}}"
-  - "--label=org.opencontainers.image.name={{.ProjectName}}"
-  - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-  - "--label=org.opencontainers.image.version={{.Version}}"
-  - "--label=org.opencontainers.image.source={{.GitURL}}"
+    - "--pull"
+    - "--label=org.opencontainers.image.created={{.Date}}"
+    - "--label=org.opencontainers.image.name={{.ProjectName}}"
+    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+    - "--label=org.opencontainers.image.version={{.Version}}"
+    - "--label=org.opencontainers.image.source={{.GitURL}}"

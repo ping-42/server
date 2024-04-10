@@ -114,9 +114,9 @@ func (w wsServer) handleIncomingClient(wr http.ResponseWriter, r *http.Request) 
 }
 
 // TODO implement validation & mv to
-func validateSensorToken(sensorID uuid.UUID, token string) bool {
-	return true
-}
+// func validateSensorToken(sensorID uuid.UUID, token string) bool {
+// 	return true
+// }
 
 func (w wsServer) listenForResults(conn sensorConnection) {
 	for {

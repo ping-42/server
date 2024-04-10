@@ -50,7 +50,7 @@ var (
 func init() {
 
 	logger.Logger.Info(
-		fmt.Sprintf("Initializing Ping42 Telemetry Server %v commit %v built %v", version, commit, date),
+		fmt.Sprintf("Initializing Telemetry Server %v commit %v build %v", version, commit, date),
 	)
 
 	configuration = config.GetConfig()

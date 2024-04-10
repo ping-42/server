@@ -50,6 +50,7 @@ dockers:
   image_templates:
     - 'ghcr.io/ping-42/server:{{ .Tag }}'
     - 'ghcr.io/ping-42/server:latest'
+    - 'ping-42/server:latest'
   dockerfile: Dockerfile
   build_flag_templates:
     - "--pull"

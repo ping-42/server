@@ -20,8 +20,6 @@ jobs:
   vettest:
     name: Go quality vetting and testing
     runs-on: ubuntu-22.04
-    env:
-      GOPRIVATE: github.com/ping-42/*
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

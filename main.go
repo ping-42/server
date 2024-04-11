@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"net"
 	"os"
 	"sync"
@@ -14,7 +12,9 @@ import (
 	"github.com/ping-42/42lib/config/consts"
 	"github.com/ping-42/42lib/db"
 	"github.com/ping-42/42lib/logger"
+
 	"github.com/ping-42/server/cmd"
+	log "github.com/sirupsen/logrus"
 
 	"gorm.io/gorm"
 )
@@ -49,33 +49,37 @@ var (
 
 func init() {
 
-	logger.Logger.Info(
-		fmt.Sprintf("Initializing Telemetry Server %v commit %v build %v", version, commit, date),
-	)
+	serverLogger.WithFields(log.Fields{
+		"version":   version,
+		"commit":    commit,
+		"buildDate": date,
+	}).Info("Starting PING42 Telemetry Server...")
 
 	configuration = config.GetConfig()
 	var err error
 
 	// TODO: down the line of using gorm/redis clients, we need to wrap this and add a retry mechanism
-	//  Furthermore, won't be as easy to mock and test
+	// TODO: Furthermore, won't be as easy to mock and test
 	gormClient, err = db.InitPostgreeDatabase(configuration.PostgreeDBDsn)
 	if err != nil {
-		logger.LogError(err.Error(), "error while connectToWsServer()", serverLogger)
-		panic(err.Error())
+		serverLogger.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Error("Unable to connect to Postgre Database")
+		os.Exit(3)
 	}
 
 	redisClient, err = db.InitRedis(configuration.RedisHost, configuration.RedisPassword)
 	if err != nil {
-		logger.LogError(err.Error(), "error while InitRedis()", serverLogger)
-		panic(err.Error())
+		serverLogger.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Error("Unable to connect to Redis Database")
+		os.Exit(4)
 	}
 }
 
 func main() {
 
-	// set up logging
-	log.SetFlags(0)
-
+	// Parse the command arguments first
 	if _, err := cmd.Parser.Parse(); err != nil {
 		switch flagsErr := err.(type) {
 		case flags.ErrorType:
@@ -90,6 +94,7 @@ func main() {
 		}
 	}
 
+	// Handle the command flags
 	cmd.Flags.Handle(cmd.HandleOpts{
 		DbClient: gormClient,
 		Logger:   serverLogger,

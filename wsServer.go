@@ -72,7 +72,10 @@ func (w wsServer) handleIncomingClient(wr http.ResponseWriter, r *http.Request) 
 	jwtToken := r.URL.Query().Get("sensor_token")
 
 	if jwtToken == "" {
-		serverLogger.Error("jwtToken reqiured!")
+		serverLogger.WithFields(log.Fields{
+			"clientAddr": r.Header.Get("X-Real-IP"),
+		}).Error("No JWT Token received from client")
+
 		return
 	}
 

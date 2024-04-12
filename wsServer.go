@@ -116,11 +116,6 @@ func (w wsServer) handleIncomingClient(wr http.ResponseWriter, r *http.Request) 
 	w.listenForResults(sensorConnections[sensorId])
 }
 
-// TODO implement validation & mv to
-// func validateSensorToken(sensorID uuid.UUID, token string) bool {
-// 	return true
-// }
-
 func (w wsServer) listenForResults(conn sensorConnection) {
 	for {
 		msg, _, err := wsutil.ReadClientData(conn.Connection)

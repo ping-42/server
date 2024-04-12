@@ -3,11 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/ping-42/42lib/constants"
-	"github.com/ping-42/42lib/db/models"
 	"github.com/ping-42/42lib/dns"
 	"github.com/ping-42/42lib/http"
 	"github.com/ping-42/42lib/icmp"
@@ -52,6 +49,7 @@ func handleSensorResult(sensorResult sensorTask.TResult, sensorId uuid.UUID) (er
 	}
 	return
 }
+
 func (rh resultHandler) handleDnsResult(sensorResult sensorTask.TResult, sensorID uuid.UUID) (err error) {
 
 	var dnsRes = dns.Result{}
@@ -60,22 +58,9 @@ func (rh resultHandler) handleDnsResult(sensorResult sensorTask.TResult, sensorI
 		return fmt.Errorf("Unmarshal dns.Result{} err:%v", err)
 	}
 
-	// -------------- task results -----------
-	dnsResult := models.TsDnsResult{
-		TsSensorTaskBase: models.TsSensorTaskBase{
-			Time:     time.Now().UTC(),
-			SensorID: sensorID,
-			TaskID:   sensorResult.TaskId,
-		},
-		QueryRtt:  dnsRes.QueryRtt.Milliseconds(),
-		SocketRtt: dnsRes.SockRtt.Milliseconds(),
-		RespSize:  dnsRes.RespSize,
-		Proto:     constants.ProtoTCP, // TODO: fix in the DNS, now hardcoded
-		// IPAddresses: dnsRes.GetIpSlice(), // TODO need to see how to store the IPs
-	}
-	err = gormClient.Create(&dnsResult).Error
+	err = storeDnsResults(sensorID, sensorResult.TaskId, dnsRes)
 	if err != nil {
-		return fmt.Errorf("failed to insert dns result: %v", err)
+		return
 	}
 
 	err = storeHostRuntimeStat(sensorID, sensorResult.TaskId, sensorResult.HostTelemetry)
@@ -92,57 +77,21 @@ func (rh resultHandler) handleIcmpResult(sensorResult sensorTask.TResult, sensor
 	var icmpRes icmp.Result
 	err = json.Unmarshal(sensorResult.Result, &icmpRes)
 	if err != nil {
-		return fmt.Errorf("Unmarshal dns.Result{} err:%v", err)
+		return fmt.Errorf("Unmarshal icmp.Result{} err:%v", err)
 	}
 
-	// in case we have also DNS test
-	if icmpRes.DnsResult.Proto != "" {
-
-		// -------------- store DNS task results -----------
-		dnsResult := models.TsDnsResult{
-			TsSensorTaskBase: models.TsSensorTaskBase{
-				Time:     time.Now().UTC(),
-				SensorID: sensorID,
-				TaskID:   sensorResult.TaskId,
-			},
-			QueryRtt:  icmpRes.DnsResult.QueryRtt.Milliseconds(),
-			SocketRtt: icmpRes.DnsResult.SockRtt.Milliseconds(),
-			RespSize:  icmpRes.DnsResult.RespSize,
-			Proto:     constants.ProtoTCP, // TODO: fix in the DNS, now hardcoded
-			// IPAddresses: dnsRes.GetIpSlice(), // TODO need to see how to store the IPs
-		}
-		err = gormClient.Create(&dnsResult).Error
+	// store DNS task result in case we have domain in the opts
+	if icmpRes.DnsResult.Proto != 0 { // todo implement check for empty
+		err = storeDnsResults(sensorID, sensorResult.TaskId, icmpRes.DnsResult)
 		if err != nil {
-			return fmt.Errorf("failed to insert dns result triggerd by icmp task: %v", err)
+			return
 		}
 	}
 
-	// TODO uncomment once we have the 42lib build
-	// for _, res := range icmpRes.ResultPerIp {
-	// 	// -------------- store ICMP task results -----------
-	// 	icmpResult := models.TsIcmpResult{
-	// 		TsSensorTaskBase: models.TsSensorTaskBase{
-	// 			Time:     time.Now().UTC(),
-	// 			SensorID: sensorID,
-	// 			TaskID:   sensorResult.TaskId,
-	// 		},
-	// 		IPAddr:          res.IPAddr,
-	// 		PacketsSent:     res.PacketsSent,
-	// 		PacketsReceived: res.PacketsReceived,
-	// 		BytesWritten:    res.BytesWritten,
-	// 		BytesRead:       res.BytesRead,
-	// 		TotalRTT:        res.TotalRTT,
-	// 		MinRTT:          res.MinRTT,
-	// 		MaxRTT:          res.MaxRTT,
-	// 		AverageRTT:      res.AverageRTT,
-	// 		Loss:            res.Loss,
-	// 		FailureMessages: strings.Join(res.FailureMessages, ";"),
-	// 	}
-	// 	err = gormClient.Create(&icmpResult).Error
-	// 	if err != nil {
-	// 		return fmt.Errorf("failed to insert dns result: %v", err)
-	// 	}
-	// }
+	err = storeIcmpResults(sensorID, sensorResult.TaskId, icmpRes)
+	if err != nil {
+		return
+	}
 
 	err = storeHostRuntimeStat(sensorID, sensorResult.TaskId, sensorResult.HostTelemetry)
 	if err != nil {
@@ -168,29 +117,9 @@ func (rh resultHandler) handleHttpResult(sensorResult sensorTask.TResult, sensor
 		return
 	}
 
-	// -------------- task results -----------
-	httpResult := models.TsHttpResult{
-		TsSensorTaskBase: models.TsSensorTaskBase{
-			Time:     time.Now().UTC(),
-			SensorID: sensorID,
-			TaskID:   sensorResult.TaskId,
-		},
-		ResponseCode:     uint8(httpRes.ResponseCode),
-		DNSLookup:        httpRes.DNSLookup,
-		TCPConnection:    httpRes.TCPConnection,
-		TLSHandshake:     httpRes.TLSHandshake,
-		ServerProcessing: httpRes.ServerProcessing,
-		NameLookup:       httpRes.NameLookup,
-		Connect:          httpRes.Connect,
-		Pretransfer:      httpRes.Pretransfer,
-		StartTransfer:    httpRes.StartTransfer,
-		//
-		ResponseBody:    httpRes.ResponseBody,
-		ResponseHeaders: headersJson,
-	}
-	err = gormClient.Create(&httpResult).Error
+	err = storeHttpResults(sensorID, sensorResult.TaskId, httpRes, headersJson)
 	if err != nil {
-		return fmt.Errorf("failed to insert dns result: %v", err)
+		return
 	}
 
 	err = storeHostRuntimeStat(sensorID, sensorResult.TaskId, sensorResult.HostTelemetry)
@@ -199,31 +128,5 @@ func (rh resultHandler) handleHttpResult(sensorResult sensorTask.TResult, sensor
 	}
 
 	serverLogger.Info("HTTP result saved successfully for task id:", sensorResult.TaskId)
-	return
-}
-
-func storeHostRuntimeStat(sensorID uuid.UUID, taskId uuid.UUID, ht sensorTask.HostTelemetry) (err error) {
-	// -------------- host telemetry -----------
-	runtimeStats := models.TsHostRuntimeStat{
-		TsSensorTaskBase: models.TsSensorTaskBase{
-			Time:     time.Now().UTC(),
-			SensorID: sensorID,
-			TaskID:   taskId,
-		},
-		GoRoutineCount: ht.GoRoutines,
-		CpuCores:       ht.Cpu.Cores,
-		CpuUsage:       ht.Cpu.CpuUsage,
-		CpuModelName:   ht.Cpu.ModelName,
-		MemTotal:       ht.Memory.Total,
-		MemUsed:        ht.Memory.Used,
-		MemFree:        ht.Memory.Free,
-		MemUsedPercent: ht.Memory.UsedPercent,
-		// TODO: Think how to handle network telemetry. Maybe it should be in a separate hypertable? Skipped for now.
-	}
-
-	err = gormClient.Create(&runtimeStats).Error
-	if err != nil {
-		return fmt.Errorf("failed to insert runtime stats: %v", err)
-	}
 	return
 }

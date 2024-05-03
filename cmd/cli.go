@@ -49,7 +49,7 @@ func (f *opts) Handle(opts HandleOpts) {
 	}
 
 	if Parser.Command.Active != nil && Parser.Command.Active.Name == "mksensor" {
-		q(&f.CreateNewSensor, opts)
+		handleBuildNewSensor(&f.CreateNewSensor, opts)
 		opts.Logger.Infof("new sensor created")
 		os.Exit(0)
 	}

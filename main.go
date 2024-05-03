@@ -3,6 +3,7 @@ package main
 import (
 	"net"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/go-redis/redis"
@@ -24,7 +25,8 @@ type sensorConnection struct {
 	// Uuid unique id per each connection
 	ConnectionId uuid.UUID
 	// Connection ws connection
-	Connection net.Conn
+	// we do not need this field storing it to Redis
+	Connection net.Conn `json:"-"`
 	// models.Sensor.ID
 	SensorId uuid.UUID
 }
@@ -89,8 +91,12 @@ func main() {
 			serverLogger.Error(flagsErr)
 			os.Exit(1)
 		default:
-			serverLogger.Error(flagsErr)
-			os.Exit(1)
+			// ignore error if command is not specified
+			// not clear implementation needs to be fixed..
+			if !strings.HasPrefix(flagsErr.Error(), "Please specify the") {
+				serverLogger.Error(flagsErr)
+				os.Exit(1)
+			}
 		}
 	}
 

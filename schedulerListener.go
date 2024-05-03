@@ -8,7 +8,7 @@ import (
 	"github.com/go-redis/redis"
 	"github.com/ping-42/42lib/db/models"
 	"github.com/ping-42/42lib/logger"
-	"github.com/ping-42/42lib/sensorTask"
+	"github.com/ping-42/42lib/sensor"
 )
 
 func schedulerListener(pubsub *redis.PubSub) {
@@ -19,7 +19,7 @@ func schedulerListener(pubsub *redis.PubSub) {
 			return
 		}
 
-		var recevedTask sensorTask.Task
+		var recevedTask sensor.Task
 		err = json.Unmarshal([]byte(msg.Payload), &recevedTask)
 		if err != nil {
 			logger.LogError(err.Error(), fmt.Sprintf("error unmarshal message:%v", msg.Payload), serverLogger)

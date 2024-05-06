@@ -17,9 +17,9 @@ import (
 	"github.com/gobwas/ws/wsutil"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/ping-42/42lib/constants"
 	"github.com/ping-42/42lib/db/models"
-	"github.com/ping-42/42lib/logger"
-	"github.com/ping-42/42lib/sensorTask"
+	"github.com/ping-42/42lib/wss"
 	"github.com/ping-42/server/cmd"
 	log "github.com/sirupsen/logrus"
 )
@@ -92,6 +92,13 @@ func (w wsServer) handleIncomingClient(wr http.ResponseWriter, r *http.Request) 
 	}
 
 	defer func() {
+
+		// Delete active sensor from redis
+		err := redisClient.Del(constants.RedisPrefixActiveSensors + sensorId.String()).Err()
+		if err != nil {
+			serverLogger.Error("error deleting redis active sensor key:", err)
+		}
+
 		connLock.Lock()
 		delete(sensorConnections, sensorId)
 		serverLogger.Info("deleted connection ", connectionId.String(), " sernsorID:", sensorId)
@@ -113,10 +120,10 @@ func (w wsServer) handleIncomingClient(wr http.ResponseWriter, r *http.Request) 
 
 	serverLogger.Info("added new connection", connectionId.String(), " sensorID:", sensorId)
 
-	w.listenForResults(sensorConnections[sensorId])
+	w.listenForMessages(sensorConnections[sensorId]) // TODO maybe in goroutine?
 }
 
-func (w wsServer) listenForResults(conn sensorConnection) {
+func (w wsServer) listenForMessages(conn sensorConnection) {
 	for {
 		msg, _, err := wsutil.ReadClientData(conn.Connection)
 		if err != nil {
@@ -128,56 +135,39 @@ func (w wsServer) listenForResults(conn sensorConnection) {
 			continue
 		}
 
-		serverLogger.Info(fmt.Sprintf("received message ConnectionId:%v, %v", conn.ConnectionId.String(), string(msg)))
+		serverLogger.Info(fmt.Sprintf("received message ConnectionId:%v, sensorId:%v, msg:%v", conn.ConnectionId.String(), conn.SensorId.String(), string(msg)))
 
-		// parse the base result
-		var sensorResult = sensorTask.TResult{}
-		err = json.Unmarshal(msg, &sensorResult)
+		// Determine message type
+		var generalMessage wss.GeneralMessage
+		err = json.Unmarshal(msg, &generalMessage)
 		if err != nil {
-			serverLogger.Error(fmt.Sprintf("msg Unmarshal error:%v, ConnectionId:%v", err, conn.ConnectionId.String()))
+			serverLogger.Error(fmt.Sprintf("Unmarshal WssMessageType err:%v, msg:%v", err, string(msg)))
 			continue
 		}
 
-		// init the logger
-		serverLogger := serverLogger.WithFields(log.Fields{
-			"task_name":     sensorResult.TaskName,
-			"task_id":       sensorResult.TaskId,
-			"connection_id": conn.ConnectionId.String(),
-		})
+		switch generalMessage.MessageGeneralType {
+		case wss.MessageTypeTaskResult:
 
-		// Update the task status to RESULTS_RECEIVED_BY_SERVER
-		updateTx := gormClient.Model(&models.Task{}).Where("id = ?", sensorResult.TaskId).Update("task_status_id", 7)
-		if updateTx.Error != nil {
-			logger.LogError(updateTx.Error.Error(), "error updating to RESULTS_RECEIVED_BY_SERVER", serverLogger)
-			continue
-		}
-
-		// if we have error from the sernsor
-		if sensorResult.Error != "" {
-			logger.LogError(sensorResult.Error, "sensor error", serverLogger)
-			// update the task status to ERROR
-			updateTx := gormClient.Model(&models.Task{}).Where("id = ?", sensorResult.TaskId).Update("task_status_id", 9)
-			if updateTx.Error != nil {
-				logger.LogError(updateTx.Error.Error(), "error updating to ERROR", serverLogger)
+			err = handleTaskResultMessage(conn.SensorId, msg)
+			if err != nil {
+				serverLogger.Error(fmt.Sprintf("handleSensorResultMessage err:%v, msg:%v", err, string(msg)))
 				continue
 			}
-			continue
-		}
 
-		// handle & insert the result to the db
-		err = handleSensorResult(sensorResult, conn.SensorId)
-		if err != nil {
-			logger.LogError(err.Error(), "error handleSensorResult", serverLogger)
-			continue
-		}
+		case wss.MessageTypeTelemtry:
 
-		// update the task status to DONE & increment the Client Subscription
-		err = taskDone(sensorResult.TaskId)
-		if err != nil {
-			logger.LogError(err.Error(), "error taskDone", serverLogger)
+			err = handleTelemtryMessage(conn, msg)
+			if err != nil {
+				serverLogger.Error(fmt.Sprintf("handleTelemtryMessage err:%v, msg:%v", err, string(msg)))
+				continue
+			}
+
+		default:
+			serverLogger.Error(fmt.Sprintf("unexpected wssMessageType:%v, msg:%v", generalMessage.MessageGeneralType, string(msg)))
 			continue
 		}
 	}
+
 }
 
 func (w wsServer) getSensorWsConnection(sensorId uuid.UUID) (con sensorConnection, exists bool) {
@@ -192,38 +182,6 @@ func (w wsServer) sendTaskToSensors(wsConn sensorConnection, tt []byte) error {
 		return fmt.Errorf("error WriteServerMessage newTask to client:%v, %v", wsConn.ConnectionId.String(), err)
 	}
 	return nil
-}
-
-func taskDone(taskId uuid.UUID) (err error) {
-	// 1. Laod the task
-	var task models.Task
-	if err = gormClient.First(&task, "id = ?", taskId).Error; err != nil {
-		err = fmt.Errorf("Failed to load Task record, TaskStatusID:%v, to DONE err:%v", taskId, err)
-		return
-	}
-
-	// 2. Load the associated ClientSubscription record
-	var clientSubscription models.ClientSubscription
-	if err = gormClient.First(&clientSubscription, "id = ?", task.ClientSubscriptionID).Error; err != nil {
-		err = fmt.Errorf("Failed to load ClientSubscription record,  TaskStatusID:%v, to DONE err:%v", taskId, err)
-		return
-	}
-
-	// 3. Increment the TestsCountExecuted field by one
-	clientSubscription.TestsCountExecuted++
-	clientSubscription.LastExecutionCompleted = time.Now()
-	if err = gormClient.Save(&clientSubscription).Error; err != nil {
-		err = fmt.Errorf("Failed to update TestsCountExecuted, TaskStatusID:%v, to DONE err:%v", taskId, err)
-		return
-	}
-
-	// 4. Update the task status to DONE
-	task.TaskStatusID = 8
-	if err = gormClient.Save(&task).Error; err != nil {
-		err = fmt.Errorf("Failed to update Task status, TaskStatusID:%v, to DONE err:%v", taskId, err)
-		return
-	}
-	return
 }
 
 func parseAndValidateJwtToken(jwtToken string) (sensorId uuid.UUID, err error) {

@@ -10,7 +10,7 @@ import (
 	"github.com/ping-42/42lib/dns"
 	"github.com/ping-42/42lib/http"
 	"github.com/ping-42/42lib/icmp"
-	"github.com/ping-42/42lib/sensorTask"
+	"github.com/ping-42/42lib/sensor"
 )
 
 func storeIcmpResults(sensorID uuid.UUID, taskID uuid.UUID, icmpRes icmp.Result) (err error) {
@@ -109,13 +109,10 @@ func storeDnsResults(sensorID uuid.UUID, taskID uuid.UUID, dnsRes dns.Result) (e
 	return
 }
 
-func storeHostRuntimeStat(sensorID uuid.UUID, taskId uuid.UUID, ht sensorTask.HostTelemetry) (err error) {
+func storeHostRuntimeStat(sensorID uuid.UUID, ht sensor.HostTelemetry) (err error) {
 	runtimeStats := models.TsHostRuntimeStat{
-		TsSensorTaskBase: models.TsSensorTaskBase{
-			Time:     time.Now().UTC(),
-			SensorID: sensorID,
-			TaskID:   taskId,
-		},
+		SensorID:       sensorID,
+		Time:           time.Now().UTC(),
 		GoRoutineCount: ht.GoRoutines,
 		CpuCores:       ht.Cpu.Cores,
 		CpuUsage:       ht.Cpu.CpuUsage,

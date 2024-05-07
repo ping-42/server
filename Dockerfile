@@ -41,4 +41,4 @@ RUN chown ping42: -R ./ && chmod go-w -R ./ && rm -rf /tmp/*
 
 USER ping42
 
-CMD ["./sensor"]
+CMD ["./server"]

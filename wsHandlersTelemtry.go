@@ -23,12 +23,13 @@ func handleTelemtryMessage(conn sensorConnection, msg []byte) (err error) {
 	}
 
 	// Store active connection data in Redis with ttl
-	activeConnJSON, err := json.Marshal(conn)
-	if err != nil {
-		err = fmt.Errorf("failed to marshal active connection data:%v", err)
-		return
-	}
-	err = redisClient.Set(constants.RedisPrefixActiveSensors+conn.SensorId.String(), activeConnJSON, constants.TelemetryMonitorPeriod+constants.TelemetryMonitorPeriodThreshold).Err()
+	// activeConnJSON, err := json.Marshal(conn)
+	// if err != nil {
+	// 	err = fmt.Errorf("failed to marshal active connection data:%v", err)
+	// 	return
+	// }
+
+	err = redisClient.Set(constants.RedisActiveSensorsKeyPrefix+conn.SensorId.String(), conn.SensorId, constants.TelemetryMonitorPeriod+constants.TelemetryMonitorPeriodThreshold).Err()
 	if err != nil {
 		err = fmt.Errorf("failed to store active connection data in Redis:%v", err)
 		return

@@ -94,7 +94,7 @@ func (w wsServer) handleIncomingClient(wr http.ResponseWriter, r *http.Request) 
 	defer func() {
 
 		// Delete active sensor from redis
-		err := redisClient.Del(constants.RedisPrefixActiveSensors + sensorId.String()).Err()
+		err := redisClient.Del(constants.RedisActiveSensorsKeyPrefix + sensorId.String()).Err()
 		if err != nil {
 			serverLogger.Error("error deleting redis active sensor key:", err)
 		}
@@ -117,6 +117,12 @@ func (w wsServer) handleIncomingClient(wr http.ResponseWriter, r *http.Request) 
 		SensorId:     sensorId,
 	}
 	connLock.Unlock()
+
+	// Add active sensor from redis
+	err = redisClient.Set(constants.RedisActiveSensorsKeyPrefix+sensorId.String(), sensorId, constants.TelemetryMonitorPeriod+constants.TelemetryMonitorPeriodThreshold).Err()
+	if err != nil {
+		serverLogger.Error("failed to store active connection data in Redis:", err.Error(), sensorId)
+	}
 
 	serverLogger.Info("added new connection", connectionId.String(), " sensorID:", sensorId)
 

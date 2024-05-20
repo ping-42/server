@@ -69,25 +69,31 @@ func (w wsServer) run() {
 func (w wsServer) handleIncomingClient(wr http.ResponseWriter, r *http.Request) {
 
 	connectionId := uuid.New()
-	jwtToken := r.URL.Query().Get("sensor_token")
 
+	jwtToken := r.Header.Get("Authorization")
 	if jwtToken == "" {
 		serverLogger.WithFields(log.Fields{
 			"clientAddr": r.Header.Get("X-Real-IP"),
 		}).Error("No JWT Token received from client")
-
+		http.Error(wr, "No sensor_token received", http.StatusBadRequest)
 		return
 	}
 
 	sensorId, err := parseAndValidateJwtToken(jwtToken)
 	if err != nil {
-		serverLogger.Error(fmt.Sprintf("parseJwtToken err:%v", err))
+		serverLogger.WithFields(log.Fields{
+			"clientAddr": r.Header.Get("X-Real-IP"),
+		}).Error(fmt.Sprintf("parseJwtToken err:%v", err))
+		http.Error(wr, "Not valid sensor_token received", http.StatusUnauthorized)
 		return
 	}
 
 	conn, _, _, err := ws.UpgradeHTTP(r, wr)
 	if err != nil {
-		serverLogger.Error("upgrade error", err)
+		serverLogger.WithFields(log.Fields{
+			"clientAddr": r.Header.Get("X-Real-IP"),
+		}).Error("UpgradeHTTP error", err)
+		http.Error(wr, "Not valid sensor_token received", http.StatusInternalServerError)
 		return
 	}
 

@@ -10,7 +10,7 @@ import (
 	"github.com/ping-42/42lib/db/migrations"
 	"github.com/ping-42/42lib/db/models"
 	"github.com/ping-42/42lib/sensor"
-	"github.com/ping-42/server/server"
+	"github.com/ping-42/server/wsServer"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )

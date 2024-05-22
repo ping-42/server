@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-redis/redis"
 	ws "github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
 	"github.com/golang-jwt/jwt/v5"
@@ -20,20 +21,23 @@ import (
 	"github.com/ping-42/42lib/constants"
 	"github.com/ping-42/42lib/db/models"
 	"github.com/ping-42/42lib/wss"
-	"github.com/ping-42/server/cmd"
 	log "github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 )
 
-type wsServer struct{}
+type wsServer struct {
+	dbClient    *gorm.DB
+	redisClient *redis.Client
+}
 
-func (w wsServer) run() {
+func (w wsServer) run(port string) {
 	// Set up a handler function for incoming requests
 	http.HandleFunc("/", w.handleIncomingClient)
 
 	// Start listening for incoming requests
-	ln, err := net.Listen("tcp", cmd.Flags.Port)
+	ln, err := net.Listen("tcp", port)
 	if err != nil {
-		serverLogger.Error("listen error", cmd.Flags.Port, err)
+		serverLogger.Error("listen error", port, err)
 		return
 	}
 
@@ -69,32 +73,38 @@ func (w wsServer) run() {
 func (w wsServer) handleIncomingClient(wr http.ResponseWriter, r *http.Request) {
 
 	connectionId := uuid.New()
-	jwtToken := r.URL.Query().Get("sensor_token")
 
+	jwtToken := r.Header.Get("Authorization")
 	if jwtToken == "" {
 		serverLogger.WithFields(log.Fields{
 			"clientAddr": r.Header.Get("X-Real-IP"),
 		}).Error("No JWT Token received from client")
-
+		http.Error(wr, "No sensor_token received", http.StatusBadRequest)
 		return
 	}
 
-	sensorId, err := parseAndValidateJwtToken(jwtToken)
+	sensorId, err := w.parseAndValidateJwtToken(jwtToken)
 	if err != nil {
-		serverLogger.Error(fmt.Sprintf("parseJwtToken err:%v", err))
+		serverLogger.WithFields(log.Fields{
+			"clientAddr": r.Header.Get("X-Real-IP"),
+		}).Error(fmt.Sprintf("parseJwtToken err:%v", err))
+		http.Error(wr, "Not valid sensor_token received", http.StatusUnauthorized)
 		return
 	}
 
 	conn, _, _, err := ws.UpgradeHTTP(r, wr)
 	if err != nil {
-		serverLogger.Error("upgrade error", err)
+		serverLogger.WithFields(log.Fields{
+			"clientAddr": r.Header.Get("X-Real-IP"),
+		}).Error("UpgradeHTTP error", err)
+		http.Error(wr, "Not valid sensor_token received", http.StatusInternalServerError)
 		return
 	}
 
 	defer func() {
 
 		// Delete active sensor from redis
-		err := redisClient.Del(constants.RedisActiveSensorsKeyPrefix + sensorId.String()).Err()
+		err := w.redisClient.Del(constants.RedisActiveSensorsKeyPrefix + sensorId.String()).Err()
 		if err != nil {
 			serverLogger.Error("error deleting redis active sensor key:", err)
 		}
@@ -119,7 +129,7 @@ func (w wsServer) handleIncomingClient(wr http.ResponseWriter, r *http.Request) 
 	connLock.Unlock()
 
 	// Add active sensor from redis
-	err = redisClient.Set(constants.RedisActiveSensorsKeyPrefix+sensorId.String(), sensorId, constants.TelemetryMonitorPeriod+constants.TelemetryMonitorPeriodThreshold).Err()
+	err = w.redisClient.Set(constants.RedisActiveSensorsKeyPrefix+sensorId.String(), sensorId, constants.TelemetryMonitorPeriod+constants.TelemetryMonitorPeriodThreshold).Err()
 	if err != nil {
 		serverLogger.Error("failed to store active connection data in Redis:", err.Error(), sensorId)
 	}
@@ -154,7 +164,7 @@ func (w wsServer) listenForMessages(conn sensorConnection) {
 		switch generalMessage.MessageGeneralType {
 		case wss.MessageTypeTaskResult:
 
-			err = handleTaskResultMessage(conn.SensorId, msg)
+			err = w.handleTaskResultMessage(conn.SensorId, msg)
 			if err != nil {
 				serverLogger.Error(fmt.Sprintf("handleSensorResultMessage err:%v, msg:%v", err, string(msg)))
 				continue
@@ -162,7 +172,7 @@ func (w wsServer) listenForMessages(conn sensorConnection) {
 
 		case wss.MessageTypeTelemtry:
 
-			err = handleTelemtryMessage(conn, msg)
+			err = w.handleTelemtryMessage(conn, msg)
 			if err != nil {
 				serverLogger.Error(fmt.Sprintf("handleTelemtryMessage err:%v, msg:%v", err, string(msg)))
 				continue
@@ -190,7 +200,7 @@ func (w wsServer) sendTaskToSensors(wsConn sensorConnection, tt []byte) error {
 	return nil
 }
 
-func parseAndValidateJwtToken(jwtToken string) (sensorId uuid.UUID, err error) {
+func (w wsServer) parseAndValidateJwtToken(jwtToken string) (sensorId uuid.UUID, err error) {
 
 	// Parse the token without validation in order to get the sensorId
 	token, _, err := new(jwt.Parser).ParseUnverified(jwtToken, jwt.MapClaims{})
@@ -219,7 +229,7 @@ func parseAndValidateJwtToken(jwtToken string) (sensorId uuid.UUID, err error) {
 
 	// select the NOT VALIDATED sensor and validate with the secret
 	var sensor models.Sensor
-	if err = gormClient.First(&sensor, "id = ?", sensorIdNotValidated).Error; err != nil {
+	if err = w.dbClient.First(&sensor, "id = ?", sensorIdNotValidated).Error; err != nil {
 		err = fmt.Errorf("Failed to load Sensor record, sensorIdNotValidated:%v, err:%v", sensorIdNotValidated, err)
 		return
 	}

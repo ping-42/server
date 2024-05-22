@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ import (
 	"github.com/ping-42/42lib/sensor"
 )
 
-func storeIcmpResults(sensorID uuid.UUID, taskID uuid.UUID, icmpRes icmp.Result) (err error) {
+func (w wsServer) storeIcmpResults(sensorID uuid.UUID, taskID uuid.UUID, icmpRes icmp.Result) (err error) {
 
 	for _, res := range icmpRes.ResultPerIp {
 		icmpResult := models.TsIcmpResult{
@@ -34,7 +34,7 @@ func storeIcmpResults(sensorID uuid.UUID, taskID uuid.UUID, icmpRes icmp.Result)
 			Loss:            res.Loss,
 			FailureMessages: strings.Join(res.FailureMessages, ";"),
 		}
-		err = gormClient.Create(&icmpResult).Error
+		err = w.dbClient.Create(&icmpResult).Error
 		if err != nil {
 			return fmt.Errorf("failed to insert dns result: %v", err)
 		}
@@ -42,7 +42,7 @@ func storeIcmpResults(sensorID uuid.UUID, taskID uuid.UUID, icmpRes icmp.Result)
 	return
 }
 
-func storeHttpResults(sensorID uuid.UUID, taskID uuid.UUID, httpRes http.Result, headersJson []byte) (err error) {
+func (w wsServer) storeHttpResults(sensorID uuid.UUID, taskID uuid.UUID, httpRes http.Result, headersJson []byte) (err error) {
 	httpResult := models.TsHttpResult{
 		TsSensorTaskBase: models.TsSensorTaskBase{
 			Time:     time.Now().UTC(),
@@ -62,7 +62,7 @@ func storeHttpResults(sensorID uuid.UUID, taskID uuid.UUID, httpRes http.Result,
 		ResponseBody:    httpRes.ResponseBody,
 		ResponseHeaders: headersJson,
 	}
-	err = gormClient.Create(&httpResult).Error
+	err = w.dbClient.Create(&httpResult).Error
 	if err != nil {
 		return fmt.Errorf("failed to insert dns result: %v", err)
 	}
@@ -70,7 +70,7 @@ func storeHttpResults(sensorID uuid.UUID, taskID uuid.UUID, httpRes http.Result,
 	return
 }
 
-func storeDnsResults(sensorID uuid.UUID, taskID uuid.UUID, dnsRes dns.Result) (err error) {
+func (w wsServer) storeDnsResults(sensorID uuid.UUID, taskID uuid.UUID, dnsRes dns.Result) (err error) {
 	taskBase := models.TsSensorTaskBase{
 		Time:     time.Now().UTC(),
 		SensorID: sensorID,
@@ -84,7 +84,7 @@ func storeDnsResults(sensorID uuid.UUID, taskID uuid.UUID, dnsRes dns.Result) (e
 		RespSize:         dnsRes.RespSize,
 		Proto:            dnsRes.Proto,
 	}
-	err = gormClient.Create(&dnsResult).Error
+	err = w.dbClient.Create(&dnsResult).Error
 	if err != nil {
 		return fmt.Errorf("failed to insert TsDnsResult result: %v", err)
 	}
@@ -101,7 +101,7 @@ func storeDnsResults(sensorID uuid.UUID, taskID uuid.UUID, dnsRes dns.Result) (e
 			A:                answer.A,
 		}
 
-		err := gormClient.Create(&httpResultAnswer).Error
+		err := w.dbClient.Create(&httpResultAnswer).Error
 		if err != nil {
 			return fmt.Errorf("failed to insert TsDnsResultAnswer answer: %v", err)
 		}
@@ -109,7 +109,7 @@ func storeDnsResults(sensorID uuid.UUID, taskID uuid.UUID, dnsRes dns.Result) (e
 	return
 }
 
-func storeHostRuntimeStat(sensorID uuid.UUID, ht sensor.HostTelemetry) (err error) {
+func (w wsServer) storeHostRuntimeStat(sensorID uuid.UUID, ht sensor.HostTelemetry) (err error) {
 	runtimeStats := models.TsHostRuntimeStat{
 		SensorID:       sensorID,
 		Time:           time.Now().UTC(),
@@ -124,7 +124,7 @@ func storeHostRuntimeStat(sensorID uuid.UUID, ht sensor.HostTelemetry) (err erro
 		// TODO: Think how to handle network telemetry. Maybe it should be in a separate hypertable? Skipped for now.
 	}
 
-	err = gormClient.Create(&runtimeStats).Error
+	err = w.dbClient.Create(&runtimeStats).Error
 	if err != nil {
 		return fmt.Errorf("failed to insert runtime stats: %v", err)
 	}

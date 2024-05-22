@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"encoding/json"
@@ -9,9 +9,10 @@ import (
 	"github.com/ping-42/42lib/db/models"
 	"github.com/ping-42/42lib/logger"
 	"github.com/ping-42/42lib/sensor"
+	"gorm.io/gorm"
 )
 
-func schedulerListener(pubsub *redis.PubSub) {
+func (w wsServer) schedulerListener(gormClient *gorm.DB, pubsub *redis.PubSub) {
 	for {
 		msg, err := pubsub.ReceiveMessage()
 		if err != nil {
@@ -34,7 +35,7 @@ func schedulerListener(pubsub *redis.PubSub) {
 		serverLogger.Info(fmt.Sprintf("RecevedTask for SensorID:%v, TaskId:%v\n", recevedTask.SensorId, recevedTask.Id))
 
 		// the sensor may not be connected to this server, in this case just pass the task
-		wsConn, exists := ws42.getSensorWsConnection(recevedTask.SensorId)
+		wsConn, exists := w.getSensorWsConnection(recevedTask.SensorId)
 		if !exists {
 			serverLogger.Info(fmt.Sprintf("Not intrested passing... The sensor is not connected to this server. SensorID:%v, TaskId:%v\n", recevedTask.SensorId, recevedTask.Id))
 			continue
@@ -48,7 +49,7 @@ func schedulerListener(pubsub *redis.PubSub) {
 		}
 
 		// send the received message to the sensor
-		err = ws42.sendTaskToSensors(wsConn, []byte(msg.Payload))
+		err = w.sendTaskToSensors(wsConn, []byte(msg.Payload))
 		if err != nil {
 			logger.LogError(err.Error(), "sendTaskToSensors err:", serverLogger)
 			return

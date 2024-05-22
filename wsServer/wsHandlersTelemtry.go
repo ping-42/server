@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"encoding/json"
@@ -8,7 +8,7 @@ import (
 	"github.com/ping-42/42lib/sensor"
 )
 
-func handleTelemtryMessage(conn sensorConnection, msg []byte) (err error) {
+func (w wsServer) handleTelemtryMessage(conn sensorConnection, msg []byte) (err error) {
 
 	var hostTelemetryMsg sensor.HostTelemetry
 	err = json.Unmarshal(msg, &hostTelemetryMsg)
@@ -17,7 +17,7 @@ func handleTelemtryMessage(conn sensorConnection, msg []byte) (err error) {
 		return
 	}
 
-	err = storeHostRuntimeStat(conn.SensorId, hostTelemetryMsg)
+	err = w.storeHostRuntimeStat(conn.SensorId, hostTelemetryMsg)
 	if err != nil {
 		return
 	}
@@ -29,7 +29,7 @@ func handleTelemtryMessage(conn sensorConnection, msg []byte) (err error) {
 	// 	return
 	// }
 
-	err = redisClient.Set(constants.RedisActiveSensorsKeyPrefix+conn.SensorId.String(), conn.SensorId, constants.TelemetryMonitorPeriod+constants.TelemetryMonitorPeriodThreshold).Err()
+	err = w.redisClient.Set(constants.RedisActiveSensorsKeyPrefix+conn.SensorId.String(), conn.SensorId, constants.TelemetryMonitorPeriod+constants.TelemetryMonitorPeriodThreshold).Err()
 	if err != nil {
 		err = fmt.Errorf("failed to store active connection data in Redis:%v", err)
 		return

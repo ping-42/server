@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"encoding/json"
@@ -15,9 +15,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type resultHandler struct{}
-
-func handleTaskResultMessage(sensorId uuid.UUID, msg []byte) (err error) {
+func (w wsServer) handleTaskResultMessage(sensorId uuid.UUID, msg []byte) (err error) {
 	// parse the base result
 	var sensorResult = sensor.TResult{}
 	err = json.Unmarshal(msg, &sensorResult)
@@ -34,7 +32,7 @@ func handleTaskResultMessage(sensorId uuid.UUID, msg []byte) (err error) {
 	})
 
 	// Update the task status to RESULTS_RECEIVED_BY_SERVER
-	updateTx := gormClient.Model(&models.Task{}).Where("id = ?", sensorResult.TaskId).Update("task_status_id", 7)
+	updateTx := w.dbClient.Model(&models.Task{}).Where("id = ?", sensorResult.TaskId).Update("task_status_id", 7)
 	if updateTx.Error != nil {
 		err = fmt.Errorf("error updating to RESULTS_RECEIVED_BY_SERVER")
 		logger.LogError(updateTx.Error.Error(), "error updating to RESULTS_RECEIVED_BY_SERVER", serverLogger)
@@ -45,7 +43,7 @@ func handleTaskResultMessage(sensorId uuid.UUID, msg []byte) (err error) {
 	if sensorResult.Error != "" {
 		logger.LogError(sensorResult.Error, "sensor error", serverLogger)
 		// update the task status to ERROR
-		updateTx := gormClient.Model(&models.Task{}).Where("id = ?", sensorResult.TaskId).Update("task_status_id", 9)
+		updateTx := w.dbClient.Model(&models.Task{}).Where("id = ?", sensorResult.TaskId).Update("task_status_id", 9)
 		if updateTx.Error != nil {
 			err = fmt.Errorf("error updating to ERROR")
 			logger.LogError(updateTx.Error.Error(), "error updating to ERROR", serverLogger)
@@ -55,28 +53,26 @@ func handleTaskResultMessage(sensorId uuid.UUID, msg []byte) (err error) {
 	}
 
 	// handle & insert the result to the db
-	err = handleSensorResult(sensorResult, sensorId)
+	err = w.handleSensorResult(sensorResult, sensorId)
 	if err != nil {
 		return
 	}
 
 	// update the task status to DONE & increment the Client Subscription
-	err = taskDone(sensorResult.TaskId)
+	err = w.taskDone(sensorResult.TaskId)
 	if err != nil {
 		return
 	}
 	return
 }
 
-func handleSensorResult(sensorResult sensor.TResult, sensorId uuid.UUID) (err error) {
-
-	var rh resultHandler
+func (w wsServer) handleSensorResult(sensorResult sensor.TResult, sensorId uuid.UUID) (err error) {
 
 	// based on the type parse the actual res
 	switch sensorResult.TaskName {
 	case dns.TaskName:
 
-		err = rh.handleDnsResult(sensorResult, sensorId)
+		err = w.handleDnsResult(sensorResult, sensorId)
 		if err != nil {
 			err = fmt.Errorf("handleDnsResult error:%v", err)
 			return
@@ -84,7 +80,7 @@ func handleSensorResult(sensorResult sensor.TResult, sensorId uuid.UUID) (err er
 
 	case icmp.TaskName:
 
-		err = rh.handleIcmpResult(sensorResult, sensorId)
+		err = w.handleIcmpResult(sensorResult, sensorId)
 		if err != nil {
 			err = fmt.Errorf("handleIcmpResult error:%v", err)
 			return
@@ -92,7 +88,7 @@ func handleSensorResult(sensorResult sensor.TResult, sensorId uuid.UUID) (err er
 
 	case http.TaskName:
 
-		err = rh.handleHttpResult(sensorResult, sensorId)
+		err = w.handleHttpResult(sensorResult, sensorId)
 		if err != nil {
 			err = fmt.Errorf("handleHttpResult error:%v", err)
 			return
@@ -105,7 +101,7 @@ func handleSensorResult(sensorResult sensor.TResult, sensorId uuid.UUID) (err er
 	return
 }
 
-func (rh resultHandler) handleDnsResult(sensorResult sensor.TResult, sensorID uuid.UUID) (err error) {
+func (w wsServer) handleDnsResult(sensorResult sensor.TResult, sensorID uuid.UUID) (err error) {
 
 	var dnsRes = dns.Result{}
 	err = json.Unmarshal(sensorResult.Result, &dnsRes)
@@ -113,7 +109,7 @@ func (rh resultHandler) handleDnsResult(sensorResult sensor.TResult, sensorID uu
 		return fmt.Errorf("Unmarshal dns.Result{} err:%v", err)
 	}
 
-	err = storeDnsResults(sensorID, sensorResult.TaskId, dnsRes)
+	err = w.storeDnsResults(sensorID, sensorResult.TaskId, dnsRes)
 	if err != nil {
 		return
 	}
@@ -122,7 +118,7 @@ func (rh resultHandler) handleDnsResult(sensorResult sensor.TResult, sensorID uu
 	return
 }
 
-func (rh resultHandler) handleIcmpResult(sensorResult sensor.TResult, sensorID uuid.UUID) (err error) {
+func (w wsServer) handleIcmpResult(sensorResult sensor.TResult, sensorID uuid.UUID) (err error) {
 
 	var icmpRes icmp.Result
 	err = json.Unmarshal(sensorResult.Result, &icmpRes)
@@ -132,13 +128,13 @@ func (rh resultHandler) handleIcmpResult(sensorResult sensor.TResult, sensorID u
 
 	// store DNS task result in case we have domain in the opts
 	if icmpRes.DnsResult.Proto != 0 { // todo implement check for empty
-		err = storeDnsResults(sensorID, sensorResult.TaskId, icmpRes.DnsResult)
+		err = w.storeDnsResults(sensorID, sensorResult.TaskId, icmpRes.DnsResult)
 		if err != nil {
 			return
 		}
 	}
 
-	err = storeIcmpResults(sensorID, sensorResult.TaskId, icmpRes)
+	err = w.storeIcmpResults(sensorID, sensorResult.TaskId, icmpRes)
 	if err != nil {
 		return
 	}
@@ -148,7 +144,7 @@ func (rh resultHandler) handleIcmpResult(sensorResult sensor.TResult, sensorID u
 	return
 }
 
-func (rh resultHandler) handleHttpResult(sensorResult sensor.TResult, sensorID uuid.UUID) (err error) {
+func (w wsServer) handleHttpResult(sensorResult sensor.TResult, sensorID uuid.UUID) (err error) {
 
 	var httpRes = http.Result{}
 	err = json.Unmarshal(sensorResult.Result, &httpRes)
@@ -162,7 +158,7 @@ func (rh resultHandler) handleHttpResult(sensorResult sensor.TResult, sensorID u
 		return
 	}
 
-	err = storeHttpResults(sensorID, sensorResult.TaskId, httpRes, headersJson)
+	err = w.storeHttpResults(sensorID, sensorResult.TaskId, httpRes, headersJson)
 	if err != nil {
 		return
 	}
@@ -171,17 +167,17 @@ func (rh resultHandler) handleHttpResult(sensorResult sensor.TResult, sensorID u
 	return
 }
 
-func taskDone(taskId uuid.UUID) (err error) {
+func (w wsServer) taskDone(taskId uuid.UUID) (err error) {
 	// 1. Laod the task
 	var task models.Task
-	if err = gormClient.First(&task, "id = ?", taskId).Error; err != nil {
+	if err = w.dbClient.First(&task, "id = ?", taskId).Error; err != nil {
 		err = fmt.Errorf("Failed to load Task record, TaskStatusID:%v, to DONE err:%v", taskId, err)
 		return
 	}
 
 	// 2. Load the associated ClientSubscription record
 	var clientSubscription models.ClientSubscription
-	if err = gormClient.First(&clientSubscription, "id = ?", task.ClientSubscriptionID).Error; err != nil {
+	if err = w.dbClient.First(&clientSubscription, "id = ?", task.ClientSubscriptionID).Error; err != nil {
 		err = fmt.Errorf("Failed to load ClientSubscription record,  TaskStatusID:%v, to DONE err:%v", taskId, err)
 		return
 	}
@@ -189,14 +185,14 @@ func taskDone(taskId uuid.UUID) (err error) {
 	// 3. Increment the TestsCountExecuted field by one
 	clientSubscription.TestsCountExecuted++
 	clientSubscription.LastExecutionCompleted = time.Now()
-	if err = gormClient.Save(&clientSubscription).Error; err != nil {
+	if err = w.dbClient.Save(&clientSubscription).Error; err != nil {
 		err = fmt.Errorf("Failed to update TestsCountExecuted, TaskStatusID:%v, to DONE err:%v", taskId, err)
 		return
 	}
 
 	// 4. Update the task status to DONE
 	task.TaskStatusID = 8
-	if err = gormClient.Save(&task).Error; err != nil {
+	if err = w.dbClient.Save(&task).Error; err != nil {
 		err = fmt.Errorf("Failed to update Task status, TaskStatusID:%v, to DONE err:%v", taskId, err)
 		return
 	}

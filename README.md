@@ -1,6 +1,5 @@
 - [Ping42 Telemetry Server](#ping42-telemetry-server)
   - [BigQuery Development](#bigquery-development)
-  - [The Generator](#the-generator)
   - [CLI](#cli)
 
 # Ping42 Telemetry Server
@@ -30,15 +29,23 @@ gcloud alpha bq datasets delete clients --remove-tables
 
 > Note: In some cases a web based session could be causing the above to fail. Tough luck - delete the datasets from the BigQuery part of the GCP console.
 
-## The Generator
-
-The `generator/` folder contains boilerplate code that dispatches generated events to the function for testing purposes. To run it, try `go run .` in that folder.
-
 
 ## CLI
+
+Run migrations:
+
+```bash
+ go run . run -p 8080
+```
 
 Create new sersor:
 
 ```bash
  go run . mksensor -n SensorName -l SensorLocaltion
+```
+
+Run migrations:
+
+```bash
+ go run . migrate
 ```

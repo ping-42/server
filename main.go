@@ -30,7 +30,7 @@ func main() {
 		"commit":    commit,
 		"buildDate": date,
 	}).Info("Starting PING42 Telemetry Server ...")
-	//serverLogger := logger.Base("server")
+
 	var err error
 
 	gormClient, err := db.InitPostgreeDatabase(configuration.PostgreeDBDsn)

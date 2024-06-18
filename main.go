@@ -12,10 +12,19 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// Release versioning magic
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
+var serverLogger = logger.WithTestType("server")
+
 func main() {
 
 	configuration := config.GetConfig()
-	serverLogger := logger.Base("server")
+	//serverLogger := logger.Base("server")
 	var err error
 
 	gormClient, err := db.InitPostgreeDatabase(configuration.PostgreeDBDsn)

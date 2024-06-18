@@ -29,21 +29,7 @@ var (
 	serverLogger      = logger.Base("server")
 )
 
-// Release versioning magic
-var (
-	version = "dev"
-	commit  = "none"
-	date    = "unknown"
-)
-
 func Init(dbClient *gorm.DB, redisClient *redis.Client, logger *log.Entry, port string) {
-
-	serverLogger.WithFields(log.Fields{
-		"version":   version,
-		"commit":    commit,
-		"buildDate": date,
-		"port":      port,
-	}).Info("Starting PING42 Telemetry Server...")
 
 	// subscribe to the redis channel
 	pubsub := redisClient.Subscribe(consts.SchedulerNewTaskChannel)

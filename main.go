@@ -19,11 +19,17 @@ var (
 	date    = "unknown"
 )
 
-var serverLogger = logger.WithTestType("server")
+var serverLogger = logger.Base("server")
 
 func main() {
 
 	configuration := config.GetConfig()
+
+	serverLogger.WithFields(log.Fields{
+		"version":   version,
+		"commit":    commit,
+		"buildDate": date,
+	}).Info("Starting PING42 Telemetry Server ...")
 	//serverLogger := logger.Base("server")
 	var err error
 

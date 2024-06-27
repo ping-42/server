@@ -8,13 +8,13 @@ require (
 	github.com/gobwas/ws v1.4.0
 	github.com/google/uuid v1.6.0
 	github.com/jessevdk/go-flags v1.6.1
-	github.com/ping-42/42lib v0.1.16
+	github.com/ping-42/42lib v0.1.17
 	github.com/sirupsen/logrus v1.9.3
 	gorm.io/gorm v1.25.10
 )
 
 require (
-	github.com/docker/docker v27.0.0+incompatible // indirect
+	github.com/docker/docker v27.0.2+incompatible // indirect
 	github.com/go-gormigrate/gormigrate/v2 v2.1.2 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect

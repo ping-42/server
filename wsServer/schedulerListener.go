@@ -32,33 +32,33 @@ func (w wsServer) schedulerListener(gormClient *gorm.DB, pubsub *redis.PubSub) {
 			"TaskID":   recevedTask.Id,
 		})
 
-		serverLogger.Info(fmt.Sprintf("RecevedTask for SensorID:%v, TaskId:%v\n", recevedTask.SensorId, recevedTask.Id))
+		serverLogger.Info("Receved a task submission from sensor")
 
 		// the sensor may not be connected to this server, in this case just pass the task
 		wsConn, exists := w.getSensorWsConnection(recevedTask.SensorId)
 		if !exists {
-			serverLogger.Info(fmt.Sprintf("Not intrested passing... The sensor is not connected to this server. SensorID:%v, TaskId:%v\n", recevedTask.SensorId, recevedTask.Id))
+			serverLogger.Info("Not interested, passing task... The sensor is not connected to this server.")
 			continue
 		}
 
 		// Update the task status to RECEIVED_BY_SERVER
 		updateTx := gormClient.Model(&models.Task{}).Where("id = ?", recevedTask.Id).Update("task_status_id", 3)
 		if updateTx.Error != nil {
-			serverLogger.Info(fmt.Sprintf("updating TaskStatusID:%v, to RECEIVED_BY_SERVER err:%v", recevedTask.Id, updateTx.Error))
+			serverLogger.Error("Error updating task to RECEIVED_BY_SERVER", updateTx.Error)
 			return
 		}
 
 		// send the received message to the sensor
 		err = w.sendTaskToSensors(wsConn, []byte(msg.Payload))
 		if err != nil {
-			logger.LogError(err.Error(), "sendTaskToSensors err:", serverLogger)
+			serverLogger.Error("Error sending task to sensor", err.Error())
 			return
 		}
 
 		// Update the task status to SENT_TO_SENSOR_BY_SERVER
 		updateTx = gormClient.Model(&models.Task{}).Where("id = ?", recevedTask.Id).Update("task_status_id", 4)
 		if updateTx.Error != nil {
-			serverLogger.Info(fmt.Sprintf("updating TaskStatusID:%v, to SENT_TO_SENSOR_BY_SERVER err:%v", recevedTask.Id, updateTx.Error))
+			serverLogger.Error("Error updating task to SENT_TO_SENSOR_BY_SERVER", updateTx.Error)
 			return
 		}
 	}

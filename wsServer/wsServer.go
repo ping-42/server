@@ -151,7 +151,11 @@ func (w wsServer) listenForMessages(conn sensorConnection) {
 			continue
 		}
 
-		serverLogger.Info(fmt.Sprintf("received message ConnectionId:%v, sensorId:%v, msg:%v", conn.ConnectionId.String(), conn.SensorId.String(), string(msg)))
+		serverLogger.WithFields(
+			log.Fields{
+				"sensorId":     conn.SensorId.String(),
+				"connectionId": conn.ConnectionId.String(),
+			}).Info(fmt.Sprintf("received message msg: %v", string(msg)))
 
 		// Determine message type
 		var generalMessage wss.GeneralMessage

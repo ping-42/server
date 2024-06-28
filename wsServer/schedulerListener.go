@@ -27,9 +27,9 @@ func (w wsServer) schedulerListener(gormClient *gorm.DB, pubsub *redis.PubSub) {
 			continue
 		}
 
-		serverLogger = serverLogger.WithFields(log.Fields{
-			"SensorID": recevedTask.SensorId,
-			"TaskID":   recevedTask.Id,
+		var serverLogger = serverLogger.WithFields(log.Fields{
+			"sensorId": recevedTask.SensorId,
+			"taskId":   recevedTask.Id,
 		})
 
 		serverLogger.Info("Receved a task submission from sensor")

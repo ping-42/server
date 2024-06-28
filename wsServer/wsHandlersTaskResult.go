@@ -20,12 +20,12 @@ func (w wsServer) handleTaskResultMessage(sensorId uuid.UUID, msg []byte) (err e
 	var sensorResult = sensor.TResult{}
 	err = json.Unmarshal(msg, &sensorResult)
 	if err != nil {
-		err = fmt.Errorf("msg Unmarshal sensor.TResult error:%v", err)
+		err = fmt.Errorf("Unable to unmarshall message: %v", err)
 		return
 	}
 
 	// init the logger
-	serverLogger = serverLogger.WithFields(log.Fields{
+	var serverLogger = serverLogger.WithFields(log.Fields{
 		"task_name": sensorResult.TaskName,
 		"task_id":   sensorResult.TaskId,
 		"sensor_id": sensorId,

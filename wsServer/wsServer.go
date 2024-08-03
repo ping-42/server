@@ -79,7 +79,7 @@ func (w wsServer) handleIncomingClient(wr http.ResponseWriter, r *http.Request) 
 		serverLogger.WithFields(log.Fields{
 			"clientAddr": r.Header.Get("X-Real-IP"),
 		}).Error("No JWT Token received from client")
-		http.Error(wr, "No sensor_token received", http.StatusBadRequest)
+		http.Error(wr, "Invalid sensor token received", http.StatusBadRequest)
 		return
 	}
 
@@ -87,8 +87,8 @@ func (w wsServer) handleIncomingClient(wr http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		serverLogger.WithFields(log.Fields{
 			"clientAddr": r.Header.Get("X-Real-IP"),
-		}).Error(fmt.Sprintf("parseJwtToken err:%v", err))
-		http.Error(wr, "Not valid sensor_token received", http.StatusUnauthorized)
+		}).Error(fmt.Sprintf("Unable to parse JWT token: %v", err))
+		http.Error(wr, "Invalid sensor token received", http.StatusUnauthorized)
 		return
 	}
 
@@ -97,7 +97,7 @@ func (w wsServer) handleIncomingClient(wr http.ResponseWriter, r *http.Request) 
 		serverLogger.WithFields(log.Fields{
 			"clientAddr": r.Header.Get("X-Real-IP"),
 		}).Error("UpgradeHTTP error", err)
-		http.Error(wr, "Not valid sensor_token received", http.StatusInternalServerError)
+		http.Error(wr, "Unable to upgrade HTTP connection", http.StatusInternalServerError)
 		return
 	}
 
@@ -106,16 +106,20 @@ func (w wsServer) handleIncomingClient(wr http.ResponseWriter, r *http.Request) 
 		// Delete active sensor from redis
 		err := w.redisClient.Del(constants.RedisActiveSensorsKeyPrefix + sensorId.String()).Err()
 		if err != nil {
-			serverLogger.Error("error deleting redis active sensor key:", err)
+			serverLogger.Error("Error deleting Redis active sensor key: ", err)
 		}
 
 		connLock.Lock()
 		delete(sensorConnections, sensorId)
-		serverLogger.Info("deleted connection ", connectionId.String(), " sernsorID:", sensorId)
+		serverLogger.WithFields(log.Fields{
+			"connectionId": connectionId.String(),
+			"sensorId":     sensorId,
+		}).Info("Deleted connection")
+
 		connLock.Unlock()
 		err = conn.Close()
 		if err != nil {
-			serverLogger.Error("conn.Close() err:", err.Error())
+			serverLogger.Error("conn.Close() err: ", err.Error())
 			return
 		}
 	}()
@@ -131,10 +135,13 @@ func (w wsServer) handleIncomingClient(wr http.ResponseWriter, r *http.Request) 
 	// Add active sensor from redis
 	err = w.redisClient.Set(constants.RedisActiveSensorsKeyPrefix+sensorId.String(), sensorId, constants.TelemetryMonitorPeriod+constants.TelemetryMonitorPeriodThreshold).Err()
 	if err != nil {
-		serverLogger.Error("failed to store active connection data in Redis:", err.Error(), sensorId)
+		serverLogger.Error("Failed to store active connection data in Redis: ", err.Error(), sensorId)
 	}
 
-	serverLogger.Info("added new connection", connectionId.String(), " sensorID:", sensorId)
+	serverLogger.WithFields(log.Fields{
+		"connectionId": connectionId.String(),
+		"sensorId":     sensorId,
+	}).Info("Added new sensor connection")
 
 	w.listenForMessages(sensorConnections[sensorId]) // TODO maybe in goroutine?
 }
@@ -144,10 +151,17 @@ func (w wsServer) listenForMessages(conn sensorConnection) {
 		msg, _, err := wsutil.ReadClientData(conn.Connection)
 		if err != nil {
 			if err == io.EOF {
-				serverLogger.Info(fmt.Sprintf("client disconnected, ConnectionId:%v, SensorId:%v", conn.ConnectionId.String(), conn.SensorId))
+				serverLogger.WithFields(log.Fields{
+					"connectionId": conn.ConnectionId.String(),
+					"sensorId":     conn.SensorId,
+				}).Info("Sensor disconnected")
+
 				break // client disconnected, break out of the loop
 			}
-			serverLogger.Error(fmt.Sprintf("read message error:%v, ConnectionId:%v", err, conn.ConnectionId.String()))
+			serverLogger.WithFields(log.Fields{
+				"connectionId": conn.ConnectionId.String(),
+				"sensorId":     conn.SensorId,
+			}).Error(fmt.Sprintf("Read message error: %v", err))
 			continue
 		}
 
@@ -155,13 +169,16 @@ func (w wsServer) listenForMessages(conn sensorConnection) {
 			log.Fields{
 				"sensorId":     conn.SensorId.String(),
 				"connectionId": conn.ConnectionId.String(),
-			}).Info(fmt.Sprintf("received message msg: %v", string(msg)))
+			}).Info(fmt.Sprintf("Received message msg: %v", string(msg)))
 
 		// Determine message type
 		var generalMessage wss.GeneralMessage
 		err = json.Unmarshal(msg, &generalMessage)
 		if err != nil {
-			serverLogger.Error(fmt.Sprintf("Unmarshal WssMessageType err:%v, msg:%v", err, string(msg)))
+			serverLogger.WithFields(log.Fields{
+				"connectionId": conn.ConnectionId.String(),
+				"sensorId":     conn.SensorId,
+			}).Error(fmt.Sprintf("Unmarshal WssMessageType err: %v, msg: %v", err, string(msg)))
 			continue
 		}
 
@@ -170,7 +187,10 @@ func (w wsServer) listenForMessages(conn sensorConnection) {
 
 			err = w.handleTaskResultMessage(conn.SensorId, msg)
 			if err != nil {
-				serverLogger.Error(fmt.Sprintf("handleSensorResultMessage err:%v, msg:%v", err, string(msg)))
+				serverLogger.WithFields(log.Fields{
+					"connectionId": conn.ConnectionId.String(),
+					"sensorId":     conn.SensorId,
+				}).Error(fmt.Sprintf("handleSensorResultMessage err: %v, msg: %v", err, string(msg)))
 				continue
 			}
 
@@ -178,12 +198,18 @@ func (w wsServer) listenForMessages(conn sensorConnection) {
 
 			err = w.handleTelemtryMessage(conn, msg)
 			if err != nil {
-				serverLogger.Error(fmt.Sprintf("handleTelemtryMessage err:%v, msg:%v", err, string(msg)))
+				serverLogger.WithFields(log.Fields{
+					"connectionId": conn.ConnectionId.String(),
+					"sensorId":     conn.SensorId,
+				}).Error(fmt.Sprintf("handleTelemtryMessage err: %v, msg: %v", err, string(msg)))
 				continue
 			}
 
 		default:
-			serverLogger.Error(fmt.Sprintf("unexpected wssMessageType:%v, msg:%v", generalMessage.MessageGeneralType, string(msg)))
+			serverLogger.WithFields(log.Fields{
+				"connectionId": conn.ConnectionId.String(),
+				"sensorId":     conn.SensorId,
+			}).Error(fmt.Sprintf("Unexpected wssMessageType: %v, msg: %v", generalMessage.MessageGeneralType, string(msg)))
 			continue
 		}
 	}
@@ -196,10 +222,13 @@ func (w wsServer) getSensorWsConnection(sensorId uuid.UUID) (con sensorConnectio
 }
 
 func (w wsServer) sendTaskToSensors(wsConn sensorConnection, tt []byte) error {
-	serverLogger.Info(fmt.Sprintf("sending task:%s to client:%v", string(tt), wsConn.ConnectionId.String()))
+	serverLogger.WithFields(log.Fields{
+		"connectionId": wsConn.ConnectionId.String(),
+		"sensorId":     wsConn.SensorId.String(),
+	}).Info(fmt.Sprintf("Dispatching task: %s", string(tt)))
 	err := wsutil.WriteServerMessage(wsConn.Connection, ws.OpText, tt)
 	if err != nil {
-		return fmt.Errorf("error WriteServerMessage newTask to client:%v, %v", wsConn.ConnectionId.String(), err)
+		return fmt.Errorf("Error WriteServerMessage newTask to sensor: %v, %v", wsConn.ConnectionId.String(), err)
 	}
 	return nil
 }
@@ -209,36 +238,36 @@ func (w wsServer) parseAndValidateJwtToken(jwtToken string) (sensorId uuid.UUID,
 	// Parse the token without validation in order to get the sensorId
 	token, _, err := new(jwt.Parser).ParseUnverified(jwtToken, jwt.MapClaims{})
 	if err != nil {
-		err = fmt.Errorf("ParseUnverified:%v", err)
+		err = fmt.Errorf("ParseUnverified: %v", err)
 		return
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		err = fmt.Errorf("failed to parse claims")
+		err = fmt.Errorf("Failed to parse claims")
 		return
 	}
 
 	// Access the NOT validated claims
 	sId, ok := claims["sensorId"].(string)
 	if !ok {
-		err = fmt.Errorf("sensorId is not string")
+		err = fmt.Errorf("sensorId is not a string")
 		return
 	}
 	sensorIdNotValidated, err := uuid.ParseBytes([]byte(sId))
 	if err != nil {
-		err = fmt.Errorf("sensorId claim not found or not uuid.UUID:%v", err)
+		err = fmt.Errorf("sensorId claim not found or not uuid.UUID: %v", err)
 		return
 	}
 
 	// select the NOT VALIDATED sensor and validate with the secret
 	var sensor models.Sensor
 	if err = w.dbClient.First(&sensor, "id = ?", sensorIdNotValidated).Error; err != nil {
-		err = fmt.Errorf("Failed to load Sensor record, sensorIdNotValidated:%v, err:%v", sensorIdNotValidated, err)
+		err = fmt.Errorf("Failed to load Sensor record, sensorIdNotValidated: %v, err: %v", sensorIdNotValidated, err)
 		return
 	}
 	if sensor.Secret == "" {
-		err = fmt.Errorf("empty sensor.Secret, sensorIdNotValidated:%v", sensorIdNotValidated)
+		err = fmt.Errorf("Empty sensor.Secret, sensorIdNotValidated: %v", sensorIdNotValidated)
 		return
 	}
 
@@ -258,16 +287,16 @@ func (w wsServer) parseAndValidateJwtToken(jwtToken string) (sensorId uuid.UUID,
 		sensorId = sensorIdNotValidated
 		return
 	case errors.Is(err, jwt.ErrTokenMalformed):
-		err = fmt.Errorf("That's not even a jwt token, per sensorIdNotValidated:%v", sensorIdNotValidated)
+		err = fmt.Errorf("That's not even a JWT token, per sensorIdNotValidated: %v", sensorIdNotValidated)
 		return
 	case errors.Is(err, jwt.ErrTokenSignatureInvalid):
-		err = fmt.Errorf("Invalid jwt signature, per sensorIdNotValidated:%v", sensorIdNotValidated)
+		err = fmt.Errorf("Invalid JWT signature, per sensorIdNotValidated: %v", sensorIdNotValidated)
 		return
 	case errors.Is(err, jwt.ErrTokenExpired) || errors.Is(err, jwt.ErrTokenNotValidYet):
-		err = fmt.Errorf("Jwt Token is either expired or not active yet, per sensorIdNotValidated:%v", sensorIdNotValidated)
+		err = fmt.Errorf("JWT Token is either expired or not active yet, per sensorIdNotValidated: %v", sensorIdNotValidated)
 		return
 	default:
-		err = fmt.Errorf("Jwt Couldn't handle this token:%v, per sensorIdNotValidated:%v", err, sensorIdNotValidated)
+		err = fmt.Errorf("JWT Couldn't handle this token: %v, per sensorIdNotValidated: %v", err, sensorIdNotValidated)
 		return
 	}
 }

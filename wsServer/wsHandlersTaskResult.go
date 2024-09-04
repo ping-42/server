@@ -175,10 +175,10 @@ func (w wsServer) taskDone(taskId uuid.UUID) (err error) {
 		return
 	}
 
-	// 2. Load the associated ClientSubscription record
-	var clientSubscription models.ClientSubscription
-	if err = w.dbClient.First(&clientSubscription, "id = ?", task.ClientSubscriptionID).Error; err != nil {
-		err = fmt.Errorf("Failed to load ClientSubscription record,  TaskStatusID:%v, to DONE err:%v", taskId, err)
+	// 2. Load the associated Subscriptions records
+	var clientSubscription models.Subscription
+	if err = w.dbClient.First(&clientSubscription, "id = ?", task.SubscriptionID).Error; err != nil {
+		err = fmt.Errorf("Failed to load Subscription record,  TaskStatusID:%v, to DONE err:%v", taskId, err)
 		return
 	}
 

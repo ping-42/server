@@ -16,14 +16,14 @@ func (w wsServer) schedulerListener(gormClient *gorm.DB, pubsub *redis.PubSub) {
 	for {
 		msg, err := pubsub.ReceiveMessage()
 		if err != nil {
-			logger.LogError(err.Error(), "error receiving message", serverLogger)
-			return
+			logger.LogError(err.Error(), "pubsub.ReceiveMessage, error receiving message", serverLogger)
+			continue
 		}
 
 		var recevedTask sensor.Task
 		err = json.Unmarshal([]byte(msg.Payload), &recevedTask)
 		if err != nil {
-			logger.LogError(err.Error(), fmt.Sprintf("error unmarshal message:%v", msg.Payload), serverLogger)
+			logger.LogError(err.Error(), fmt.Sprintf("pubsub.ReceiveMessage, error unmarshal message:%v", msg.Payload), serverLogger)
 			continue
 		}
 

@@ -12,6 +12,7 @@ import (
 	"github.com/ping-42/42lib/icmp"
 	"github.com/ping-42/42lib/logger"
 	"github.com/ping-42/42lib/sensor"
+	"github.com/ping-42/42lib/traceroute"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -93,6 +94,13 @@ func (w wsServer) handleSensorResult(sensorResult sensor.TResult, sensorId uuid.
 			err = fmt.Errorf("handleHttpResult error:%v", err)
 			return
 		}
+	case traceroute.TaskName:
+
+		err = w.handleTracerouteResult(sensorResult, sensorId)
+		if err != nil {
+			err = fmt.Errorf("handleTracerouteResult error:%v", err)
+			return
+		}
 
 	default:
 		err = fmt.Errorf("msg unexpected TaskName:%v, ResponseReceived:%+v", sensorResult.TaskName, sensorResult)
@@ -164,6 +172,24 @@ func (w wsServer) handleHttpResult(sensorResult sensor.TResult, sensorID uuid.UU
 	}
 
 	serverLogger.Info("HTTP result saved successfully for task id:", sensorResult.TaskId)
+	return
+}
+
+func (w wsServer) handleTracerouteResult(sensorResult sensor.TResult, sensorID uuid.UUID) (err error) {
+
+	var tracerouteRes traceroute.Result
+	err = json.Unmarshal(sensorResult.Result, &tracerouteRes)
+	if err != nil {
+		return fmt.Errorf("Unmarshal icmp.Result{} err:%v", err)
+	}
+
+	err = w.storeTracerouteResults(sensorID, sensorResult.TaskId, tracerouteRes)
+	if err != nil {
+		return
+	}
+
+	serverLogger.Info("ICMP result saved successfully for task id:", sensorResult.TaskId)
+
 	return
 }
 

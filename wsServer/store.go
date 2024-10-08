@@ -11,6 +11,7 @@ import (
 	"github.com/ping-42/42lib/http"
 	"github.com/ping-42/42lib/icmp"
 	"github.com/ping-42/42lib/sensor"
+	"github.com/ping-42/42lib/traceroute"
 )
 
 func (w wsServer) storeIcmpResults(sensorID uuid.UUID, taskID uuid.UUID, icmpRes icmp.Result) (err error) {
@@ -109,10 +110,54 @@ func (w wsServer) storeDnsResults(sensorID uuid.UUID, taskID uuid.UUID, dnsRes d
 	return
 }
 
-func (w wsServer) storeHostRuntimeStat(sensorID uuid.UUID, ht sensor.HostTelemetry) (err error) {
+func (w wsServer) storeTracerouteResults(sensorID uuid.UUID, taskID uuid.UUID, tracerouteRes traceroute.Result) (err error) {
+	// high level traceroute result
+	tracerouteResult := models.TsTracerouteResult{
+		TsSensorTaskBase: models.TsSensorTaskBase{
+			Time:     time.Now().UTC(),
+			SensorID: sensorID,
+			TaskID:   taskID,
+		},
+		DestinationAdress: tracerouteRes.DestinationAdress,
+	}
+
+	// save the TsTracerouteResult
+	err = w.dbClient.Create(&tracerouteResult).Error
+	if err != nil {
+		return fmt.Errorf("failed to insert TsTracerouteResult: %v", err)
+	}
+
+	// sinsert hop one by one
+	for _, hop := range tracerouteRes.Hops {
+		tracerouteHop := models.TsTracerouteResultHop{
+			TsSensorTaskBase: models.TsSensorTaskBase{
+				Time:     time.Now().UTC(),
+				SensorID: sensorID,
+				TaskID:   taskID,
+			},
+			Success:       hop.Success,
+			Address:       hop.Address,
+			Host:          hop.Host,
+			BytesReceived: hop.BytesReceived,
+			ElapsedTime:   hop.ElapsedTime,
+			TTL:           hop.TTL,
+			Error:         fmt.Sprint(hop.Error),
+		}
+
+		// save each hop
+		err = w.dbClient.Create(&tracerouteHop).Error
+		if err != nil {
+			return fmt.Errorf("failed to insert TsTracerouteResultHop: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func (w wsServer) storeHostRuntimeStat(sensorID uuid.UUID, ht sensor.HostTelemetry, time time.Time) (err error) {
 	runtimeStats := models.TsHostRuntimeStat{
 		SensorID:       sensorID,
-		Time:           time.Now().UTC(),
+		Time:           time,
 		GoRoutineCount: ht.GoRoutines,
 		CpuCores:       ht.Cpu.Cores,
 		CpuUsage:       ht.Cpu.CpuUsage,
@@ -121,7 +166,6 @@ func (w wsServer) storeHostRuntimeStat(sensorID uuid.UUID, ht sensor.HostTelemet
 		MemUsed:        ht.Memory.Used,
 		MemFree:        ht.Memory.Free,
 		MemUsedPercent: ht.Memory.UsedPercent,
-		// TODO: Think how to handle network telemetry. Maybe it should be in a separate hypertable? Skipped for now.
 	}
 
 	err = w.dbClient.Create(&runtimeStats).Error
@@ -129,4 +173,40 @@ func (w wsServer) storeHostRuntimeStat(sensorID uuid.UUID, ht sensor.HostTelemet
 		return fmt.Errorf("failed to insert runtime stats: %v", err)
 	}
 	return
+}
+
+func (w wsServer) storeHostNetworkStats(sensorID uuid.UUID, networkTelemetry []sensor.Network, time time.Time) (err error) {
+	// high level network stat result
+	hostNetworkStat := models.TsHostNetworkStat{
+		Time:     time,
+		SensorID: sensorID,
+	}
+
+	// savehost network stat
+	err = w.dbClient.Create(&hostNetworkStat).Error
+	if err != nil {
+		return fmt.Errorf("failed to insert TsHostNetworkStat: %v", err)
+	}
+
+	// prepare to store stats for each interface.
+	var networkInterfaceStats []models.TsNetworkInterfaceStat
+	for _, netStat := range networkTelemetry {
+		// append network interface's stats to the list.
+		networkInterfaceStats = append(networkInterfaceStats, models.TsNetworkInterfaceStat{
+			NetworkStatID: hostNetworkStat.SensorID,
+			InterfaceName: netStat.Name,
+			BytesSent:     netStat.BytesSent,
+			BytesRecv:     netStat.BytesRecv,
+			PacketsSent:   netStat.PacketsSent,
+			PacketsRecv:   netStat.PacketsRecv,
+		})
+	}
+
+	// save collected network interface stats
+	err = w.dbClient.Create(&networkInterfaceStats).Error
+	if err != nil {
+		return fmt.Errorf("failed to insert TsNetworkInterfaceStat: %v", err)
+	}
+
+	return nil
 }

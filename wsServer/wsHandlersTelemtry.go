@@ -3,13 +3,14 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/ping-42/42lib/constants"
 	"github.com/ping-42/42lib/sensor"
 )
 
 func (w wsServer) handleTelemtryMessage(conn sensorConnection, msg []byte) (err error) {
-
+	var time = time.Now().UTC()
 	var hostTelemetryMsg sensor.HostTelemetry
 	err = json.Unmarshal(msg, &hostTelemetryMsg)
 	if err != nil {
@@ -17,7 +18,12 @@ func (w wsServer) handleTelemtryMessage(conn sensorConnection, msg []byte) (err 
 		return
 	}
 
-	err = w.storeHostRuntimeStat(conn.SensorId, hostTelemetryMsg)
+	err = w.storeHostRuntimeStat(conn.SensorId, hostTelemetryMsg, time)
+	if err != nil {
+		return
+	}
+
+	err = w.storeHostNetworkStats(conn.SensorId, hostTelemetryMsg.Network, time)
 	if err != nil {
 		return
 	}

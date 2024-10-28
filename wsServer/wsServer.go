@@ -30,6 +30,11 @@ type wsServer struct {
 	redisClient *redis.Client
 }
 
+type RedisData struct {
+	SensorId      uuid.UUID
+	SensorVersion string
+}
+
 func (w wsServer) run(port string) {
 	// Set up a handler function for incoming requests
 	http.HandleFunc("/", w.handleIncomingClient)
@@ -92,6 +97,14 @@ func (w wsServer) handleIncomingClient(wr http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	sensorVersion := r.Header.Get("SensorVersion")
+	if sensorVersion == "" {
+		serverLogger.WithFields(log.Fields{
+			"clientAddr": r.Header.Get("X-Real-IP"),
+			"sensorId":   sensorId,
+		}).Info("missing sensorId in connection request")
+	}
+
 	conn, _, _, err := ws.UpgradeHTTP(r, wr)
 	if err != nil {
 		serverLogger.WithFields(log.Fields{
@@ -126,14 +139,20 @@ func (w wsServer) handleIncomingClient(wr http.ResponseWriter, r *http.Request) 
 
 	connLock.Lock()
 	sensorConnections[sensorId] = sensorConnection{
-		ConnectionId: connectionId,
-		Connection:   conn,
-		SensorId:     sensorId,
+		ConnectionId:  connectionId,
+		Connection:    conn,
+		SensorId:      sensorId,
+		SensorVersion: sensorVersion,
 	}
 	connLock.Unlock()
 
 	// Add active sensor from redis
-	err = w.redisClient.Set(constants.RedisActiveSensorsKeyPrefix+sensorId.String(), sensorId, constants.TelemetryMonitorPeriod+constants.TelemetryMonitorPeriodThreshold).Err()
+	// err = w.redisClient.Set(constants.RedisActiveSensorsKeyPrefix+sensorId.String(), sensorId, constants.TelemetryMonitorPeriod+constants.TelemetryMonitorPeriodThreshold).Err()
+	err = w.redisClient.Set(
+		constants.RedisActiveSensorsKeyPrefix+sensorId.String(),
+		RedisData{SensorId: sensorId, SensorVersion: sensorVersion},
+		constants.TelemetryMonitorPeriod+constants.TelemetryMonitorPeriodThreshold,
+	).Err()
 	if err != nil {
 		serverLogger.Error("Failed to store active connection data in Redis: ", err.Error(), sensorId)
 	}

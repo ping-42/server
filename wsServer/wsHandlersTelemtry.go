@@ -35,7 +35,10 @@ func (w wsServer) handleTelemtryMessage(conn sensorConnection, msg []byte) (err 
 	// 	return
 	// }
 
-	err = w.redisClient.Set(constants.RedisActiveSensorsKeyPrefix+conn.SensorId.String(), conn.SensorId, constants.TelemetryMonitorPeriod+constants.TelemetryMonitorPeriodThreshold).Err()
+	err = w.redisClient.Set(
+		constants.RedisActiveSensorsKeyPrefix+conn.SensorId.String(),
+		RedisData{SensorId: conn.SensorId, SensorVersion: conn.SensorVersion},
+		constants.TelemetryMonitorPeriod+constants.TelemetryMonitorPeriodThreshold).Err()
 	if err != nil {
 		err = fmt.Errorf("failed to store active connection data in Redis:%v", err)
 		return

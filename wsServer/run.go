@@ -20,7 +20,8 @@ type sensorConnection struct {
 	// we do not need this field storing it to Redis
 	Connection net.Conn `json:"-"`
 	// models.Sensor.ID
-	SensorId uuid.UUID
+	SensorId      uuid.UUID
+	SensorVersion string
 }
 
 var (

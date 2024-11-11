@@ -16,7 +16,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (w wsServer) handleTaskResultMessage(sensorId uuid.UUID, msg []byte) (err error) {
+func (w *wsServer) handleTaskResultMessage(sensorId uuid.UUID, msg []byte) (err error) {
 	// parse the base result
 	var sensorResult = sensor.TResult{}
 	err = json.Unmarshal(msg, &sensorResult)
@@ -67,7 +67,7 @@ func (w wsServer) handleTaskResultMessage(sensorId uuid.UUID, msg []byte) (err e
 	return
 }
 
-func (w wsServer) handleSensorResult(sensorResult sensor.TResult, sensorId uuid.UUID) (err error) {
+func (w *wsServer) handleSensorResult(sensorResult sensor.TResult, sensorId uuid.UUID) (err error) {
 
 	// based on the type parse the actual res
 	switch sensorResult.TaskName {
@@ -109,7 +109,7 @@ func (w wsServer) handleSensorResult(sensorResult sensor.TResult, sensorId uuid.
 	return
 }
 
-func (w wsServer) handleDnsResult(sensorResult sensor.TResult, sensorID uuid.UUID) (err error) {
+func (w *wsServer) handleDnsResult(sensorResult sensor.TResult, sensorID uuid.UUID) (err error) {
 
 	var dnsRes = dns.Result{}
 	err = json.Unmarshal(sensorResult.Result, &dnsRes)
@@ -126,7 +126,7 @@ func (w wsServer) handleDnsResult(sensorResult sensor.TResult, sensorID uuid.UUI
 	return
 }
 
-func (w wsServer) handleIcmpResult(sensorResult sensor.TResult, sensorID uuid.UUID) (err error) {
+func (w *wsServer) handleIcmpResult(sensorResult sensor.TResult, sensorID uuid.UUID) (err error) {
 
 	var icmpRes icmp.Result
 	err = json.Unmarshal(sensorResult.Result, &icmpRes)
@@ -152,7 +152,7 @@ func (w wsServer) handleIcmpResult(sensorResult sensor.TResult, sensorID uuid.UU
 	return
 }
 
-func (w wsServer) handleHttpResult(sensorResult sensor.TResult, sensorID uuid.UUID) (err error) {
+func (w *wsServer) handleHttpResult(sensorResult sensor.TResult, sensorID uuid.UUID) (err error) {
 
 	var httpRes = http.Result{}
 	err = json.Unmarshal(sensorResult.Result, &httpRes)
@@ -175,7 +175,7 @@ func (w wsServer) handleHttpResult(sensorResult sensor.TResult, sensorID uuid.UU
 	return
 }
 
-func (w wsServer) handleTracerouteResult(sensorResult sensor.TResult, sensorID uuid.UUID) (err error) {
+func (w *wsServer) handleTracerouteResult(sensorResult sensor.TResult, sensorID uuid.UUID) (err error) {
 
 	var tracerouteRes traceroute.Result
 	err = json.Unmarshal(sensorResult.Result, &tracerouteRes)
@@ -193,7 +193,7 @@ func (w wsServer) handleTracerouteResult(sensorResult sensor.TResult, sensorID u
 	return
 }
 
-func (w wsServer) taskDone(taskId uuid.UUID) (err error) {
+func (w *wsServer) taskDone(taskId uuid.UUID) (err error) {
 	// 1. Laod the task
 	var task models.Task
 	if err = w.dbClient.First(&task, "id = ?", taskId).Error; err != nil {

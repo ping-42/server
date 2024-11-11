@@ -31,12 +31,12 @@ type wsServer struct {
 	dbClient          *gorm.DB
 	redisClient       *redis.Client
 	redisPubSub       *redis.PubSub
-	sensorConnections map[uuid.UUID]wss.SensorConnection // TODO need to see why the sensor connections is missing here
+	sensorConnections map[uuid.UUID]wss.SensorConnection
 	connLock          sync.Mutex
 	serverLogger      *logrus.Entry
 }
 
-func (w wsServer) run(port string) {
+func (w *wsServer) run(port string) {
 
 	// set up a handler function for incoming requests
 	http.HandleFunc("/", w.handleIncomingClient)
@@ -77,7 +77,7 @@ func (w wsServer) run(port string) {
 }
 
 // handleIncomingClient is the handler function for incoming clients
-func (w wsServer) handleIncomingClient(wr http.ResponseWriter, r *http.Request) {
+func (w *wsServer) handleIncomingClient(wr http.ResponseWriter, r *http.Request) {
 
 	connectionId := uuid.New()
 
@@ -171,7 +171,7 @@ func (w wsServer) handleIncomingClient(wr http.ResponseWriter, r *http.Request) 
 	w.listenForMessages(w.sensorConnections[sensorId]) // TODO maybe in goroutine?
 }
 
-func (w wsServer) listenForMessages(conn wss.SensorConnection) {
+func (w *wsServer) listenForMessages(conn wss.SensorConnection) {
 	for {
 		msg, _, err := wsutil.ReadClientData(conn.Connection)
 		if err != nil {
@@ -241,12 +241,12 @@ func (w wsServer) listenForMessages(conn wss.SensorConnection) {
 
 }
 
-func (w wsServer) getSensorWsConnection(sensorId uuid.UUID) (con wss.SensorConnection, exists bool) {
+func (w *wsServer) getSensorWsConnection(sensorId uuid.UUID) (con wss.SensorConnection, exists bool) {
 	con, exists = w.sensorConnections[sensorId]
 	return con, exists
 }
 
-func (w wsServer) sendTaskToSensors(wsConn wss.SensorConnection, tt []byte) error {
+func (w *wsServer) sendTaskToSensors(wsConn wss.SensorConnection, tt []byte) error {
 	w.serverLogger.WithFields(log.Fields{
 		"connectionId": wsConn.ConnectionId.String(),
 		"sensorId":     wsConn.SensorId.String(),
@@ -258,7 +258,7 @@ func (w wsServer) sendTaskToSensors(wsConn wss.SensorConnection, tt []byte) erro
 	return nil
 }
 
-func (w wsServer) parseAndValidateJwtToken(jwtToken string) (sensorId uuid.UUID, err error) {
+func (w *wsServer) parseAndValidateJwtToken(jwtToken string) (sensorId uuid.UUID, err error) {
 
 	// Parse the token without validation in order to get the sensorId
 	token, _, err := new(jwt.Parser).ParseUnverified(jwtToken, jwt.MapClaims{})

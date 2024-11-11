@@ -10,7 +10,7 @@ import (
 	"github.com/ping-42/42lib/sensor"
 )
 
-func (w wsServer) schedulerListener() {
+func (w *wsServer) schedulerListener() {
 	for {
 		msg, err := w.redisPubSub.ReceiveMessage()
 		if err != nil {

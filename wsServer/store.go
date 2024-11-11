@@ -14,7 +14,7 @@ import (
 	"github.com/ping-42/42lib/traceroute"
 )
 
-func (w wsServer) storeIcmpResults(sensorID uuid.UUID, taskID uuid.UUID, icmpRes icmp.Result) (err error) {
+func (w *wsServer) storeIcmpResults(sensorID uuid.UUID, taskID uuid.UUID, icmpRes icmp.Result) (err error) {
 
 	for _, res := range icmpRes.ResultPerIp {
 		icmpResult := models.TsIcmpResult{
@@ -43,7 +43,7 @@ func (w wsServer) storeIcmpResults(sensorID uuid.UUID, taskID uuid.UUID, icmpRes
 	return
 }
 
-func (w wsServer) storeHttpResults(sensorID uuid.UUID, taskID uuid.UUID, httpRes http.Result, headersJson []byte) (err error) {
+func (w *wsServer) storeHttpResults(sensorID uuid.UUID, taskID uuid.UUID, httpRes http.Result, headersJson []byte) (err error) {
 	httpResult := models.TsHttpResult{
 		TsSensorTaskBase: models.TsSensorTaskBase{
 			Time:     time.Now().UTC(),
@@ -71,7 +71,7 @@ func (w wsServer) storeHttpResults(sensorID uuid.UUID, taskID uuid.UUID, httpRes
 	return
 }
 
-func (w wsServer) storeDnsResults(sensorID uuid.UUID, taskID uuid.UUID, dnsRes dns.Result) (err error) {
+func (w *wsServer) storeDnsResults(sensorID uuid.UUID, taskID uuid.UUID, dnsRes dns.Result) (err error) {
 	taskBase := models.TsSensorTaskBase{
 		Time:     time.Now().UTC(),
 		SensorID: sensorID,
@@ -110,7 +110,7 @@ func (w wsServer) storeDnsResults(sensorID uuid.UUID, taskID uuid.UUID, dnsRes d
 	return
 }
 
-func (w wsServer) storeTracerouteResults(sensorID uuid.UUID, taskID uuid.UUID, tracerouteRes traceroute.Result) (err error) {
+func (w *wsServer) storeTracerouteResults(sensorID uuid.UUID, taskID uuid.UUID, tracerouteRes traceroute.Result) (err error) {
 	// high level traceroute result
 	tracerouteResult := models.TsTracerouteResult{
 		TsSensorTaskBase: models.TsSensorTaskBase{
@@ -154,7 +154,7 @@ func (w wsServer) storeTracerouteResults(sensorID uuid.UUID, taskID uuid.UUID, t
 	return nil
 }
 
-func (w wsServer) storeHostRuntimeStat(sensorID uuid.UUID, ht sensor.HostTelemetry, time time.Time) (err error) {
+func (w *wsServer) storeHostRuntimeStat(sensorID uuid.UUID, ht sensor.HostTelemetry, time time.Time) (err error) {
 	runtimeStats := models.TsHostRuntimeStat{
 		SensorID:       sensorID,
 		Time:           time,
@@ -175,7 +175,7 @@ func (w wsServer) storeHostRuntimeStat(sensorID uuid.UUID, ht sensor.HostTelemet
 	return
 }
 
-func (w wsServer) storeHostNetworkStats(sensorID uuid.UUID, networkTelemetry []sensor.Network, time time.Time) (err error) {
+func (w *wsServer) storeHostNetworkStats(sensorID uuid.UUID, networkTelemetry []sensor.Network, time time.Time) (err error) {
 	// high level network stat result
 	hostNetworkStat := models.TsHostNetworkStat{
 		Time:     time,

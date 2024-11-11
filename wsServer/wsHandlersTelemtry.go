@@ -10,7 +10,7 @@ import (
 	"github.com/ping-42/42lib/wss"
 )
 
-func (w wsServer) handleTelemtryMessage(conn wss.SensorConnection, msg []byte) (err error) {
+func (w *wsServer) handleTelemtryMessage(conn wss.SensorConnection, msg []byte) (err error) {
 	var time = time.Now().UTC()
 	var hostTelemetryMsg sensor.HostTelemetry
 	err = json.Unmarshal(msg, &hostTelemetryMsg)

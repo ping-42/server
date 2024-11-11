@@ -5,29 +5,27 @@ import (
 	"fmt"
 
 	"github.com/containerd/log"
-	"github.com/go-redis/redis"
 	"github.com/ping-42/42lib/db/models"
 	"github.com/ping-42/42lib/logger"
 	"github.com/ping-42/42lib/sensor"
-	"gorm.io/gorm"
 )
 
-func (w wsServer) schedulerListener(gormClient *gorm.DB, pubsub *redis.PubSub) {
+func (w *wsServer) schedulerListener() {
 	for {
-		msg, err := pubsub.ReceiveMessage()
+		msg, err := w.redisPubSub.ReceiveMessage()
 		if err != nil {
-			logger.LogError(err.Error(), "pubsub.ReceiveMessage, error receiving message", serverLogger)
+			logger.LogError(err.Error(), "pubsub.ReceiveMessage, error receiving message", w.serverLogger)
 			continue
 		}
 
 		var recevedTask sensor.Task
 		err = json.Unmarshal([]byte(msg.Payload), &recevedTask)
 		if err != nil {
-			logger.LogError(err.Error(), fmt.Sprintf("pubsub.ReceiveMessage, error unmarshal message:%v", msg.Payload), serverLogger)
+			logger.LogError(err.Error(), fmt.Sprintf("pubsub.ReceiveMessage, error unmarshal message:%v", msg.Payload), w.serverLogger)
 			continue
 		}
 
-		var serverLogger = serverLogger.WithFields(log.Fields{
+		var serverLogger = w.serverLogger.WithFields(log.Fields{
 			"sensorId": recevedTask.SensorId,
 			"taskId":   recevedTask.Id,
 		})
@@ -41,8 +39,8 @@ func (w wsServer) schedulerListener(gormClient *gorm.DB, pubsub *redis.PubSub) {
 			continue
 		}
 
-		// Update the task status to RECEIVED_BY_SERVER
-		updateTx := gormClient.Model(&models.Task{}).Where("id = ?", recevedTask.Id).Update("task_status_id", 3)
+		// update the task status to RECEIVED_BY_SERVER
+		updateTx := w.dbClient.Model(&models.Task{}).Where("id = ?", recevedTask.Id).Update("task_status_id", 3)
 		if updateTx.Error != nil {
 			serverLogger.Error("Error updating task to RECEIVED_BY_SERVER", updateTx.Error)
 			return
@@ -55,8 +53,8 @@ func (w wsServer) schedulerListener(gormClient *gorm.DB, pubsub *redis.PubSub) {
 			return
 		}
 
-		// Update the task status to SENT_TO_SENSOR_BY_SERVER
-		updateTx = gormClient.Model(&models.Task{}).Where("id = ?", recevedTask.Id).Update("task_status_id", 4)
+		// update the task status to SENT_TO_SENSOR_BY_SERVER
+		updateTx = w.dbClient.Model(&models.Task{}).Where("id = ?", recevedTask.Id).Update("task_status_id", 4)
 		if updateTx.Error != nil {
 			serverLogger.Error("Error updating task to SENT_TO_SENSOR_BY_SERVER", updateTx.Error)
 			return

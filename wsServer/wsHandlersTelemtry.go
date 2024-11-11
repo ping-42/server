@@ -7,9 +7,10 @@ import (
 
 	"github.com/ping-42/42lib/constants"
 	"github.com/ping-42/42lib/sensor"
+	"github.com/ping-42/42lib/wss"
 )
 
-func (w wsServer) handleTelemtryMessage(conn sensorConnection, msg []byte) (err error) {
+func (w *wsServer) handleTelemtryMessage(conn wss.SensorConnection, msg []byte) (err error) {
 	var time = time.Now().UTC()
 	var hostTelemetryMsg sensor.HostTelemetry
 	err = json.Unmarshal(msg, &hostTelemetryMsg)
@@ -29,13 +30,15 @@ func (w wsServer) handleTelemtryMessage(conn sensorConnection, msg []byte) (err 
 	}
 
 	// Store active connection data in Redis with ttl
-	// activeConnJSON, err := json.Marshal(conn)
-	// if err != nil {
-	// 	err = fmt.Errorf("failed to marshal active connection data:%v", err)
-	// 	return
-	// }
-
-	err = w.redisClient.Set(constants.RedisActiveSensorsKeyPrefix+conn.SensorId.String(), conn.SensorId, constants.TelemetryMonitorPeriod+constants.TelemetryMonitorPeriodThreshold).Err()
+	activeSensor, err := json.Marshal(conn)
+	if err != nil {
+		w.serverLogger.Error("marshal RedisDataActiveSensor err:", err.Error())
+		return
+	}
+	err = w.redisClient.Set(
+		constants.RedisActiveSensorsKeyPrefix+conn.SensorId.String(),
+		activeSensor,
+		constants.TelemetryMonitorPeriod+constants.TelemetryMonitorPeriodThreshold).Err()
 	if err != nil {
 		err = fmt.Errorf("failed to store active connection data in Redis:%v", err)
 		return

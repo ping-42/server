@@ -26,7 +26,7 @@ func (w wsServer) handleTaskResultMessage(sensorId uuid.UUID, msg []byte) (err e
 	}
 
 	// init the logger
-	var serverLogger = serverLogger.WithFields(log.Fields{
+	var serverLogger = w.serverLogger.WithFields(log.Fields{
 		"task_name": sensorResult.TaskName,
 		"task_id":   sensorResult.TaskId,
 		"sensor_id": sensorId,
@@ -122,7 +122,7 @@ func (w wsServer) handleDnsResult(sensorResult sensor.TResult, sensorID uuid.UUI
 		return
 	}
 
-	serverLogger.Info("DNS result saved successfully for task id:", sensorResult.TaskId)
+	w.serverLogger.Info("DNS result saved successfully for task id:", sensorResult.TaskId)
 	return
 }
 
@@ -147,7 +147,7 @@ func (w wsServer) handleIcmpResult(sensorResult sensor.TResult, sensorID uuid.UU
 		return
 	}
 
-	serverLogger.Info("ICMP result saved successfully for task id:", sensorResult.TaskId)
+	w.serverLogger.Info("ICMP result saved successfully for task id:", sensorResult.TaskId)
 
 	return
 }
@@ -171,7 +171,7 @@ func (w wsServer) handleHttpResult(sensorResult sensor.TResult, sensorID uuid.UU
 		return
 	}
 
-	serverLogger.Info("HTTP result saved successfully for task id:", sensorResult.TaskId)
+	w.serverLogger.Info("HTTP result saved successfully for task id:", sensorResult.TaskId)
 	return
 }
 
@@ -188,7 +188,7 @@ func (w wsServer) handleTracerouteResult(sensorResult sensor.TResult, sensorID u
 		return
 	}
 
-	serverLogger.Info("ICMP result saved successfully for task id:", sensorResult.TaskId)
+	w.serverLogger.Info("ICMP result saved successfully for task id:", sensorResult.TaskId)
 
 	return
 }

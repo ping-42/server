@@ -4,3 +4,4 @@ application_default_credentials.json
 vendor/
 server
 dist/
+__debug_**

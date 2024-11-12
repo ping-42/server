@@ -8,7 +8,7 @@ require (
 	github.com/gobwas/ws v1.4.0
 	github.com/google/uuid v1.6.0
 	github.com/jessevdk/go-flags v1.6.1
-	github.com/ping-42/42lib v0.1.37
+	github.com/ping-42/42lib v0.1.38
 	github.com/sirupsen/logrus v1.9.3
 	gorm.io/gorm v1.25.12
 )
@@ -33,13 +33,13 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/miekg/dns v1.1.62 // indirect
-	golang.org/x/crypto v0.28.0 // indirect
-	golang.org/x/mod v0.21.0 // indirect
-	golang.org/x/net v0.30.0 // indirect
-	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.26.0 // indirect
-	golang.org/x/text v0.19.0 // indirect
-	golang.org/x/tools v0.26.0 // indirect
+	golang.org/x/crypto v0.29.0 // indirect
+	golang.org/x/mod v0.22.0 // indirect
+	golang.org/x/net v0.31.0 // indirect
+	golang.org/x/sync v0.9.0 // indirect
+	golang.org/x/sys v0.27.0 // indirect
+	golang.org/x/text v0.20.0 // indirect
+	golang.org/x/tools v0.27.0 // indirect
 )
 
 // replace github.com/ping-42/42lib => ../42lib

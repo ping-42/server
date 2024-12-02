@@ -8,7 +8,7 @@ require (
 	github.com/gobwas/ws v1.4.0
 	github.com/google/uuid v1.6.0
 	github.com/jessevdk/go-flags v1.6.1
-	github.com/ping-42/42lib v0.1.38
+	github.com/ping-42/42lib v0.1.39
 	github.com/sirupsen/logrus v1.9.3
 	gorm.io/gorm v1.25.12
 )

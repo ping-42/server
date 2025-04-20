@@ -180,7 +180,7 @@ func (w *wsServer) handleTracerouteResult(sensorResult sensor.TResult, sensorID 
 	var tracerouteRes traceroute.Result
 	err = json.Unmarshal(sensorResult.Result, &tracerouteRes)
 	if err != nil {
-		return fmt.Errorf("Unmarshal icmp.Result{} err:%v", err)
+		return fmt.Errorf("Unmarshal traceroute.Result{} err:%v", err)
 	}
 
 	err = w.storeTracerouteResults(sensorID, sensorResult.TaskId, tracerouteRes)
@@ -188,7 +188,7 @@ func (w *wsServer) handleTracerouteResult(sensorResult sensor.TResult, sensorID 
 		return
 	}
 
-	w.serverLogger.Info("ICMP result saved successfully for task id:", sensorResult.TaskId)
+	w.serverLogger.Info("traceroute result saved successfully for task id:", sensorResult.TaskId)
 
 	return
 }

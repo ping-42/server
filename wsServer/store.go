@@ -141,7 +141,7 @@ func (w *wsServer) storeTracerouteResults(sensorID uuid.UUID, taskID uuid.UUID, 
 			BytesReceived: hop.BytesReceived,
 			ElapsedTime:   hop.ElapsedTime,
 			TTL:           hop.TTL,
-			Error:         fmt.Sprint(hop.Error),
+			Error:         hop.ErrorMessage,
 		}
 
 		// save each hop
